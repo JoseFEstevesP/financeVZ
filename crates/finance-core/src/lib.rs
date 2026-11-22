@@ -15,5 +15,5 @@ pub use format::{format_cents_input, format_money, format_rate, usd_to_ves, ves_
 pub use ids::{CategoryId, ExpenseId, IncomeId, RecurringPaymentId};
 pub use income::{Income, NewIncome};
 pub use money::{Currency, Money};
-pub use recurring::{NewRecurringPayment, PaymentStatus, RecurringPayment};
+pub use recurring::{NewRecurringPayment, PaymentMethod, PaymentStatus, RecurringPayment};
 pub use report::{build_income_report, build_report, CategoryTotal, MonthlyTotal, Report};

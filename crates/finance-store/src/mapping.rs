@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate};
 use finance_core::{
-    Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money, RecurringPayment,
-    RecurringPaymentId,
+    Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money, PaymentMethod,
+    RecurringPayment, RecurringPaymentId,
 };
 use rusqlite::{types::Type, Error, Row};
 
@@ -74,6 +74,10 @@ pub fn recurring_from_row(row: &Row<'_>) -> Result<RecurringPayment, Error> {
         let month = parts.next()?.parse().ok()?;
         Some((year, month))
     });
+    let due_date = row
+        .get::<_, Option<String>>("due_date")?
+        .and_then(|value| NaiveDate::parse_from_str(&value, "%Y-%m-%d").ok());
+    let method = PaymentMethod::parse(&row.get::<_, String>("payment_method")?);
 
     Ok(RecurringPayment {
         id: RecurringPaymentId::new(row.get("id")?),
@@ -81,6 +85,8 @@ pub fn recurring_from_row(row: &Row<'_>) -> Result<RecurringPayment, Error> {
         amount: Money::from_cents(cents, currency),
         category_id: CategoryId::new(row.get("category_id")?),
         due_day: row.get::<_, i64>("due_day")? as u8,
+        due_date,
+        method,
         note: row.get("note")?,
         last_paid_period,
         is_active: row.get::<_, i64>("is_active")? == 1,

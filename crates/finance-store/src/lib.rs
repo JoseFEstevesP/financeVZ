@@ -10,7 +10,7 @@ mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDate};
     use finance_core::{
-        Currency, Money, NewExpense, NewIncome, NewRecurringPayment, PaymentStatus,
+        Currency, Money, NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus,
     };
 
     #[test]
@@ -105,12 +105,16 @@ mod tests {
             amount: Money::new(1500, Currency::new("USD").unwrap()).unwrap(),
             category_id,
             due_day: 25,
-            note: None,
+            due_date: None,
+            method: PaymentMethod::Cashea,
+            note: Some("Cuota 1/6".into()),
         };
         let id = repo.add_recurring_payment(&payment).unwrap();
         let payments = repo.recurring_payments().unwrap();
         assert_eq!(payments.len(), 1);
         assert_eq!(payments[0].due_day, 25);
+        assert_eq!(payments[0].method, PaymentMethod::Cashea);
+        assert_eq!(payments[0].note.as_deref(), Some("Cuota 1/6"));
         assert_eq!(
             payments[0].status(NaiveDate::from_ymd_opt(2026, 11, 20).unwrap()),
             PaymentStatus::Pending(5)
@@ -138,6 +142,45 @@ mod tests {
         );
         assert!(repo.delete_recurring_payment(id).unwrap());
         assert!(repo.recurring_payments().unwrap().is_empty());
+    }
+
+    #[test]
+    fn persists_one_time_payment_with_specific_date() {
+        let repo = SqliteRepository::open_in_memory().unwrap();
+        let category_id = repo.add_category("Compras", None, "#ffffff").unwrap();
+        let due = NaiveDate::from_ymd_opt(2026, 11, 25).unwrap();
+        let payment = NewRecurringPayment {
+            name: "Cashea".into(),
+            amount: Money::new(8000, Currency::new("USD").unwrap()).unwrap(),
+            category_id,
+            due_day: 25,
+            due_date: Some(due),
+            method: PaymentMethod::Cashea,
+            note: Some("Cuota 3/6".into()),
+        };
+        let id = repo.add_recurring_payment(&payment).unwrap();
+        let payments = repo.recurring_payments().unwrap();
+        assert_eq!(payments[0].due_date, Some(due));
+        assert!(payments[0].is_one_time());
+        assert_eq!(payments[0].method, PaymentMethod::Cashea);
+
+        let paid_on = NaiveDate::from_ymd_opt(2026, 11, 20).unwrap();
+        let expense = NewExpense {
+            amount: Money::new(8000, Currency::new("USD").unwrap()).unwrap(),
+            category_id,
+            note: None,
+            spent_at: DateTime::parse_from_rfc3339("2026-11-20T09:00:00-04:00").unwrap(),
+            local_date: paid_on,
+            evidence_path: None,
+            rate_cents: None,
+            rate_day: None,
+        };
+        repo.pay_recurring_payment(id, &expense).unwrap();
+        assert_eq!(
+            repo.recurring_payments().unwrap()[0]
+                .status(NaiveDate::from_ymd_opt(2026, 12, 20).unwrap()),
+            PaymentStatus::Paid
+        );
     }
 
     #[test]
