@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["crates/finance-core", "crates/finance-store", "crates/finance-app"]
+
+[workspace.package]
+edition = "2024"
+license = "private"
+publish = false
+
+[workspace.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+finance-core = { path = "crates/finance-core" }
+finance-store = { path = "crates/finance-store" }

@@ -1,0 +1,7 @@
+[application]
+name = "financevz"
+android_manifest = "android/AndroidManifest.xml"
+
+[bundle]
+identifier = "com.gato99.financevz"
+publisher = "gato99"

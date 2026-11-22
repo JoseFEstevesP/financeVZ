@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150">
+  <g transform="translate(10 10) scale(0.49)">
+    <path fill="#000" fill-rule="evenodd" d="M18 128 A110 110 0 1 0 238 128 A110 110 0 1 0 18 128 Z M58 128 A70 70 0 1 1 198 128 A70 70 0 1 1 58 128 Z M92 252 L128 202 L164 252 Z"/>
+  </g>
+  <text x="150" y="100" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="62" font-weight="700" letter-spacing="-2" fill="#000">finance<tspan font-weight="500">VZ</tspan></text>
+</svg>

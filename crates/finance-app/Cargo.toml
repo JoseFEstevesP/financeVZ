@@ -1,0 +1,36 @@
+[package]
+name = "finance-app"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "finance-app"
+path = "src/main.rs"
+
+[features]
+default = ["desktop"]
+desktop = ["dioxus/desktop"]
+mobile = ["dioxus/mobile"]
+
+[dependencies]
+base64 = "0.22"
+dioxus = { version = "0.7" }
+finance-core.workspace = true
+finance-store.workspace = true
+chrono.workspace = true
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+ureq = { version = "3", features = ["json"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-context = "0.1"
+jni = "0.21"
+android_logger = "0.15"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+env_logger = "0.11"

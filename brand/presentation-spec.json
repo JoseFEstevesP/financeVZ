@@ -1,0 +1,34 @@
+{
+  "brand": "finanzasVZ",
+  "tagline": "Tus finanzas, bajo control.",
+  "brief": "App Android de finanzas personales: registro rápido de gastos, categorías, reportes visuales, pagos mensuales con avisos y conversión USD/Bolívares.",
+  "adjectives": ["claro", "preciso", "confiable", "moderno"],
+  "industry": "finance",
+  "mockups": ["payment-card", "app-icon", "website", "social", "business-card", "favicon-tab"],
+  "nav": ["Inicio", "Gastos", "Reportes", "Pagos"],
+  "tile_color": "#0F1420",
+  "brand_color": "#2DD4A7",
+  "greyscale": false,
+  "final": true,
+  "round": 1,
+  "concepts": [
+    {
+      "name": "D — Barras en ascenso",
+      "symbol": "concept-d.svg",
+      "lockup": "financevz-horizontal.svg",
+      "stacked": "financevz-stacked.svg",
+      "avatar": "financevz-symbol-small.svg",
+      "symbol_on_tile": "financevz-symbol.svg",
+      "stacked_on_tile": "financevz-stacked-dark.svg",
+      "lockup_on_dark": "financevz-horizontal-dark.svg",
+      "stacked_on_dark": "financevz-stacked-dark.svg",
+      "idea": "Tres barras que crecen y terminan en flecha: progreso financiero de un vistazo.",
+      "rationale": [
+        "La punta de flecha distingue el símbolo de un gráfico genérico y refuerza la idea de avance.",
+        "Los tres bloques macizos con esquinas redondeadas se leen incluso a 16 px y en iconos de launcher.",
+        "El verde menta sobre tinta oscura transmite confianza y claridad en pantallas de datos."
+      ]
+    }
+  ],
+  "recommendation": "Se recomienda el concepto D para producción: es distinto al anterior, escala bien y se integra con la paleta de la aplicación."
+}
