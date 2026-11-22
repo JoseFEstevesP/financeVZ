@@ -26,8 +26,19 @@ pub fn Categories(props: CategoriesProps) -> Element {
             color: category.color.clone(),
         })
         .collect();
+    let income_categories: Vec<CategoryRow> = snapshot
+        .income_categories
+        .iter()
+        .map(|category| CategoryRow {
+            icon: category.icon.clone().unwrap_or_else(|| "💵".to_owned()),
+            name: category.name.clone(),
+            color: category.color.clone(),
+        })
+        .collect();
     let name = snapshot.new_category_name.clone();
     let color = snapshot.new_category_color.clone();
+    let income_name = snapshot.new_income_category_name.clone();
+    let income_color = snapshot.new_income_category_color.clone();
     let feedback = snapshot.feedback.clone();
     drop(snapshot);
 
@@ -36,6 +47,17 @@ pub fn Categories(props: CategoriesProps) -> Element {
             div { class: "card",
                 h3 { "Categorías" }
                 for category in categories {
+                    div { class: "category-row",
+                        span { class: "dot", style: "background: {category.color};" }
+                        span { "{category.icon}" }
+                        span { class: "grow", "{category.name}" }
+                    }
+                }
+            }
+
+            div { class: "card",
+                h3 { "Categorías de ingreso" }
+                for category in income_categories {
                     div { class: "category-row",
                         span { class: "dot", style: "background: {category.color};" }
                         span { "{category.icon}" }
@@ -61,7 +83,7 @@ pub fn Categories(props: CategoriesProps) -> Element {
                     placeholder: "#4f8cff",
                     oninput: move |event| { state.write().new_category_color = event.value(); },
                 }
-                if let Some(message) = feedback {
+                if let Some(message) = feedback.clone() {
                     p { class: "feedback", "{message}" }
                 }
                 button { class: "primary wide", onclick: move |_| state.write().add_category(),
@@ -69,6 +91,30 @@ pub fn Categories(props: CategoriesProps) -> Element {
                 }
             }
 
+            div { class: "card",
+                h3 { "Nueva categoría de ingreso" }
+                label { class: "field-label", "Nombre" }
+                input {
+                    class: "text-input",
+                    value: income_name,
+                    placeholder: "Ej. Bonos",
+                    maxlength: "40",
+                    oninput: move |event| { state.write().new_income_category_name = event.value(); },
+                }
+                label { class: "field-label", "Color" }
+                input {
+                    class: "text-input",
+                    value: income_color,
+                    placeholder: "#2dd4a7",
+                    oninput: move |event| { state.write().new_income_category_color = event.value(); },
+                }
+                if let Some(message) = feedback.clone() {
+                    p { class: "feedback", "{message}" }
+                }
+                button { class: "primary wide", onclick: move |_| state.write().add_income_category(),
+                    "Crear categoría de ingreso"
+                }
+            }
         }
     }
 }

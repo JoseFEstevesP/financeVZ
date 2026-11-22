@@ -6,6 +6,8 @@ use crate::{
     category::Category,
     error::DomainError,
     expense::Expense,
+    ids::CategoryId,
+    income::Income,
     money::{Currency, Money},
 };
 
@@ -31,22 +33,41 @@ pub struct Report {
 }
 
 pub fn build_report(expenses: &[Expense], categories: &[Category]) -> Result<Report, DomainError> {
-    let currency = expenses
+    let entries: Vec<_> = expenses
+        .iter()
+        .map(|expense| (expense.local_date, expense.category_id, expense.amount.clone()))
+        .collect();
+    aggregate(&entries, categories)
+}
+
+pub fn build_income_report(incomes: &[Income], categories: &[Category]) -> Result<Report, DomainError> {
+    let entries: Vec<_> = incomes
+        .iter()
+        .map(|income| (income.local_date, income.category_id, income.amount.clone()))
+        .collect();
+    aggregate(&entries, categories)
+}
+
+fn aggregate(
+    entries: &[(chrono::NaiveDate, CategoryId, Money)],
+    categories: &[Category],
+) -> Result<Report, DomainError> {
+    let currency = entries
         .first()
-        .map(|expense| expense.amount.currency().clone())
+        .map(|(_, _, amount)| amount.currency().clone())
         .unwrap_or_else(|| Currency::new("USD").expect("USD is valid"));
 
-    let total = expenses.iter().try_fold(Money::zero(currency.clone()), |acc, expense| {
-        acc.checked_add(&expense.amount)
+    let total = entries.iter().try_fold(Money::zero(currency.clone()), |acc, (_, _, amount)| {
+        acc.checked_add(amount)
     })?;
 
     let mut by_category: BTreeMap<i64, i64> = BTreeMap::new();
     let mut by_month: BTreeMap<(i32, u32), i64> = BTreeMap::new();
 
-    for expense in expenses {
-        *by_category.entry(expense.category_id.get()).or_default() += expense.amount.cents();
-        let key = (expense.local_date.year(), expense.local_date.month());
-        *by_month.entry(key).or_default() += expense.amount.cents();
+    for (date, category_id, amount) in entries {
+        *by_category.entry(category_id.get()).or_default() += amount.cents();
+        let key = (date.year(), date.month());
+        *by_month.entry(key).or_default() += amount.cents();
     }
 
     let category_totals = by_category
@@ -92,7 +113,11 @@ pub fn build_report(expenses: &[Expense], categories: &[Category]) -> Result<Rep
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ids::{CategoryId, ExpenseId}, money::Currency};
+    use crate::{
+        ids::{CategoryId, ExpenseId, IncomeId},
+        income::Income,
+        money::Currency,
+    };
     use chrono::{DateTime, NaiveDate};
 
     fn category(id: i64, name: &str) -> Category {
@@ -142,6 +167,37 @@ mod tests {
         assert!((report.by_category[0].percentage - 50.0).abs() < f64::EPSILON);
         assert_eq!(report.by_month.len(), 1);
         assert_eq!(report.by_month[0].total.cents(), 3000);
+    }
+
+    #[test]
+    fn income_report_aggregates_categories_and_months() {
+        let categories = vec![category(1, "Sueldo"), category(2, "Freelance")];
+        let make_income = |id: i64, category_id: i64, cents: i64, day: u32| Income {
+            id: IncomeId::new(id),
+            amount: Money::new(cents, Currency::new("USD").unwrap()).unwrap(),
+            category_id: CategoryId::new(category_id),
+            note: None,
+            received_at: DateTime::parse_from_rfc3339(&format!(
+                "2026-11-{day:02}T12:00:00-04:00"
+            ))
+            .unwrap(),
+            local_date: NaiveDate::from_ymd_opt(2026, 11, day).unwrap(),
+            rate_cents: None,
+            rate_day: None,
+        };
+        let incomes = vec![
+            make_income(1, 1, 100000, 5),
+            make_income(2, 1, 100000, 20),
+            make_income(3, 2, 50000, 20),
+        ];
+
+        let report = build_income_report(&incomes, &categories).unwrap();
+        assert_eq!(report.total.cents(), 250000);
+        assert_eq!(report.by_category.len(), 2);
+        assert_eq!(report.by_category[0].category.name, "Sueldo");
+        assert_eq!(report.by_category[0].total.cents(), 200000);
+        assert_eq!(report.by_month.len(), 1);
+        assert_eq!(report.by_month[0].total.cents(), 250000);
     }
 
     #[test]

@@ -16,5 +16,6 @@ macro_rules! id_newtype {
 }
 
 id_newtype!(ExpenseId);
+id_newtype!(IncomeId);
 id_newtype!(CategoryId);
 id_newtype!(RecurringPaymentId);

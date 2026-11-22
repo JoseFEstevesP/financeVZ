@@ -15,7 +15,16 @@ pub fn Reports(props: ReportsProps) -> Element {
     let mut state = props.state;
     let snapshot = state.read();
     let report = snapshot.report();
+    let income_report = snapshot.income_report();
     let total = report.as_ref().map(|r| r.total.cents()).unwrap_or(0);
+    let income_total = income_report.as_ref().map(|r| r.total.cents()).unwrap_or(0);
+    let income_by_category = income_report
+        .as_ref()
+        .map(|r| r.by_category.clone())
+        .unwrap_or_default();
+    let month_income = snapshot.month_income_total();
+    let month_expense = snapshot.month_total();
+    let balance = snapshot.month_balance();
     let by_category = report
         .as_ref()
         .map(|r| r.by_category.clone())
@@ -28,15 +37,54 @@ pub fn Reports(props: ReportsProps) -> Element {
     let rate_input = snapshot.rate_input.clone();
     let feedback = snapshot.feedback.clone();
     let secondary = money_ves(total, rate);
+    let balance_class = if balance >= 0 { "balance-positive" } else { "balance-negative" };
     drop(snapshot);
 
     rsx! {
         div { class: "page",
             div { class: "hero compact",
-                span { class: "muted", "Total registrado" }
+                span { class: "muted", "Gastos registrados" }
                 h2 { class: "amount", "{money_usd(total)}" }
                 if let Some(ves) = secondary {
                     p { class: "secondary-amount", "{ves}" }
+                }
+            }
+
+            div { class: "card",
+                h3 { "Balance del mes" }
+                div { class: "summary-grid",
+                    div {
+                        span { class: "muted", "Ingresos" }
+                        strong { "{money_usd(month_income)}" }
+                    }
+                    div {
+                        span { class: "muted", "Gastos" }
+                        strong { "{money_usd(month_expense)}" }
+                    }
+                    div {
+                        span { class: "muted", "Balance" }
+                        strong { class: balance_class, "{money_usd(balance)}" }
+                    }
+                }
+            }
+
+            div { class: "card",
+                h3 { "Ingresos por categoría" }
+                if income_by_category.is_empty() {
+                    p { class: "muted", "Sin ingresos registrados." }
+                } else {
+                    div { class: "donut-wrap",
+                        Donut { items: income_by_category.clone(), total: income_total }
+                    }
+                    div { class: "legend",
+                        for item in income_by_category.iter() {
+                            div { class: "legend-row",
+                                span { class: "dot", style: "background: {item.category.color};" }
+                                span { class: "legend-name", "{item.category.name}" }
+                                span { class: "legend-value", "{money_usd(item.total.cents())}" }
+                            }
+                        }
+                    }
                 }
             }
 

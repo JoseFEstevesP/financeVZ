@@ -11,7 +11,8 @@ use finance_store::SqliteRepository;
 
 use state::{AppState, View};
 use views::{
-    add::Add, categories::Categories, home::Home, payments::Payments, reports::Reports,
+    add::Add, add_income::AddIncome, categories::Categories, home::Home, income::Incomes,
+    payments::Payments, reports::Reports,
 };
 
 static APP_STATE: OnceLock<AppState> = OnceLock::new();
@@ -69,6 +70,8 @@ fn App() -> Element {
             Home { state: app_state, go_add: move |_| app_state.write().set_view(View::Add) }
         },
         View::Add => rsx! { Add { state: app_state } },
+        View::Income => rsx! { Incomes { state: app_state } },
+        View::AddIncome => rsx! { AddIncome { state: app_state } },
         View::Reports => rsx! { Reports { state: app_state } },
         View::Categories => rsx! { Categories { state: app_state } },
         View::Payments => rsx! { Payments { state: app_state } },
@@ -92,6 +95,7 @@ fn App() -> Element {
             }
             nav { class: "bottom-nav",
                 Tab { target: View::Home, label: "Inicio", icon: "🏠", active: view == View::Home, app_state }
+                Tab { target: View::Income, label: "Ingresos", icon: "💵", active: view == View::Income || view == View::AddIncome, app_state }
                 Tab { target: View::Add, label: "Añadir", icon: "➕", active: view == View::Add, app_state }
                 Tab { target: View::Reports, label: "Reportes", icon: "📊", active: view == View::Reports, app_state }
                 Tab { target: View::Categories, label: "Categorías", icon: "🏷️", active: view == View::Categories, app_state }
@@ -168,8 +172,8 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .file-input { width: 100%; color: #93a0b8; background: #0e1421; border: 1px dashed #2b3752;
   border-radius: 12px; padding: 12px 14px; font-size: 14px; }
 .evidence-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 13px; }
-.tab { flex: 1; background: none; border: 0; color: #93a0b8; padding: 11px 2px 13px;
-  display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px;
+.tab { flex: 1; background: none; border: 0; color: #93a0b8; padding: 11px 1px 13px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px;
   cursor: pointer; }
 .tab.active { color: #8fb4ff; }
 .tab-icon { font-size: 18px; }
@@ -184,4 +188,10 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .primary.small { padding: 8px 12px; font-size: 13px; }
 .link.small-link { padding: 6px 4px; }
 .category-grid.two { grid-template-columns: repeat(2, 1fr); }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 16px; }
+.summary-grid > div { display: flex; flex-direction: column; gap: 4px; background: #0e1421;
+  border: 1px solid #2b3752; border-radius: 12px; padding: 10px; }
+.summary-grid strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+.balance-positive { color: #2dd4a7; }
+.balance-negative { color: #ff8a8a; }
 "#;

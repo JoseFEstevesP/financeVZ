@@ -14,7 +14,7 @@ pub enum DomainError {
     InvalidPaymentName,
     #[error("el día de vencimiento debe estar entre 1 y 31")]
     InvalidDueDay,
-    #[error("la fecha local no coincide con la fecha del gasto")]
+    #[error("la fecha local no coincide con la fecha del movimiento")]
     DateMismatch,
     #[error("no se pueden mezclar divisas en un reporte")]
     MixedCurrencies,

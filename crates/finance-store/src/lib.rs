@@ -9,7 +9,9 @@ pub use sqlite::SqliteRepository;
 mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDate};
-    use finance_core::{Currency, Money, NewExpense, NewRecurringPayment, PaymentStatus};
+    use finance_core::{
+        Currency, Money, NewExpense, NewIncome, NewRecurringPayment, PaymentStatus,
+    };
 
     #[test]
     fn persists_categories_expenses_and_report() {
@@ -51,6 +53,42 @@ mod tests {
 
         assert!(repo.delete_expense(expense_id).unwrap());
         assert!(repo.expenses_between(from, to).unwrap().is_empty());
+    }
+
+    #[test]
+    fn persists_income_categories_and_incomes() {
+        let repo = SqliteRepository::open_in_memory().unwrap();
+        let category_id = repo
+            .add_income_category("Sueldo", Some("💼"), "#2dd4a7")
+            .unwrap();
+
+        let categories = repo.income_categories().unwrap();
+        assert_eq!(categories.len(), 1);
+        assert_eq!(categories[0].name, "Sueldo");
+
+        let day = NaiveDate::from_ymd_opt(2026, 11, 20).unwrap();
+        let new = NewIncome {
+            amount: Money::new(250000, Currency::new("USD").unwrap()).unwrap(),
+            category_id,
+            note: Some("quincena".into()),
+            received_at: DateTime::parse_from_rfc3339("2026-11-20T09:00:00-04:00").unwrap(),
+            local_date: day,
+            rate_cents: Some(85789),
+            rate_day: Some(day.to_string()),
+        };
+        let id = repo.insert_income(&new).unwrap();
+        let incomes = repo.incomes_between(day, day).unwrap();
+        assert_eq!(incomes.len(), 1);
+        assert_eq!(incomes[0].id, id);
+        assert_eq!(incomes[0].amount.cents(), 250000);
+        assert_eq!(incomes[0].rate_cents, Some(85789));
+
+        let report = repo.income_report_between(day, day).unwrap();
+        assert_eq!(report.total.cents(), 250000);
+        assert_eq!(report.by_category.len(), 1);
+
+        assert!(repo.delete_income(id).unwrap());
+        assert!(repo.incomes_between(day, day).unwrap().is_empty());
     }
 
     #[test]

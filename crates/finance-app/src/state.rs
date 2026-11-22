@@ -2,9 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate};
 use finance_core::{
-    build_report, format_cents_input, format_money, format_rate, usd_to_ves, ves_to_usd, Category,
-    CategoryId, Currency, Expense, ExpenseId, Money, NewExpense, NewRecurringPayment, PaymentStatus,
-    RecurringPayment, RecurringPaymentId, Report,
+    build_income_report, build_report, format_cents_input, format_money, format_rate, usd_to_ves,
+    ves_to_usd, Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money,
+    NewExpense, NewIncome, NewRecurringPayment, PaymentStatus, RecurringPayment, RecurringPaymentId,
+    Report,
 };
 use finance_store::SqliteRepository;
 
@@ -13,7 +14,7 @@ use crate::platform;
 pub const DEFAULT_CURRENCY: &str = "USD";
 const RATE_SETTING: &str = "exchange_rate_cents";
 
-fn local_spent_at(day: NaiveDate) -> DateTime<FixedOffset> {
+fn local_moment_at(day: NaiveDate) -> DateTime<FixedOffset> {
     let now = Local::now();
     let offset = *now.offset();
     day.and_time(now.time())
@@ -26,6 +27,8 @@ fn local_spent_at(day: NaiveDate) -> DateTime<FixedOffset> {
 pub enum View {
     Home,
     Add,
+    Income,
+    AddIncome,
     Reports,
     Categories,
     Payments,
@@ -58,7 +61,10 @@ pub struct AppState {
     pub repo: Arc<Mutex<SqliteRepository>>,
     pub view: View,
     pub expenses: Vec<Expense>,
+    pub incomes: Vec<Income>,
     pub categories: Vec<Category>,
+    pub income_categories: Vec<Category>,
+    pub income_category_id: Option<CategoryId>,
     pub payments: Vec<RecurringPayment>,
     /// Dígitos del importe; el número de centavos es exactamente este valor.
     pub amount: String,
@@ -68,9 +74,16 @@ pub struct AppState {
     pub expense_rate_input: String,
     pub evidence_path: Option<String>,
     pub evidence_name: Option<String>,
+    pub income_amount: String,
+    pub income_date: String,
+    pub income_rate_input: String,
+    pub income_note: String,
+    pub income_entry_currency: EntryCurrency,
     pub category_id: Option<CategoryId>,
     pub new_category_name: String,
     pub new_category_color: String,
+    pub new_income_category_name: String,
+    pub new_income_category_color: String,
     pub entry_currency: EntryCurrency,
     pub exchange_rate_cents: i64,
     pub rate_input: String,
@@ -88,7 +101,10 @@ impl AppState {
             repo: Arc::new(Mutex::new(repo)),
             view: View::Home,
             expenses: Vec::new(),
+            incomes: Vec::new(),
             categories: Vec::new(),
+            income_categories: Vec::new(),
+            income_category_id: None,
             payments: Vec::new(),
             amount: String::new(),
             note: String::new(),
@@ -96,9 +112,16 @@ impl AppState {
             expense_rate_input: String::new(),
             evidence_path: None,
             evidence_name: None,
+            income_amount: String::new(),
+            income_date: Local::now().date_naive().to_string(),
+            income_rate_input: String::new(),
+            income_note: String::new(),
+            income_entry_currency: EntryCurrency::Usd,
             category_id: None,
             new_category_name: String::new(),
             new_category_color: "#4f8cff".to_owned(),
+            new_income_category_name: String::new(),
+            new_income_category_color: "#2dd4a7".to_owned(),
             entry_currency: EntryCurrency::Usd,
             exchange_rate_cents: 0,
             rate_input: String::new(),
@@ -110,6 +133,7 @@ impl AppState {
             toast: None,
         };
         state.seed_categories();
+        state.seed_income_categories();
         state.refresh();
         state
     }
@@ -133,12 +157,33 @@ impl AppState {
         }
     }
 
+    fn seed_income_categories(&mut self) {
+        let seeds = [
+            ("Sueldo", "💼", "#2dd4a7"),
+            ("Freelance", "🧑‍💻", "#4f8cff"),
+            ("Ventas", "🛒", "#e9c46a"),
+            ("Regalos", "🎁", "#e76f51"),
+            ("Otros", "📦", "#888888"),
+        ];
+        let Ok(repo) = self.repo.lock() else {
+            return;
+        };
+        if repo.income_categories().map(|c| c.is_empty()).unwrap_or(false) {
+            for (name, icon, color) in seeds {
+                let _ = repo.add_income_category(name, Some(icon), color);
+            }
+        }
+    }
+
     pub fn refresh(&mut self) {
         let Ok(repo) = self.repo.lock() else {
             return;
         };
         if let Ok(categories) = repo.categories() {
             self.categories = categories;
+        }
+        if let Ok(categories) = repo.income_categories() {
+            self.income_categories = categories;
         }
         if let Ok(payments) = repo.recurring_payments() {
             self.payments = payments;
@@ -158,8 +203,14 @@ impl AppState {
         if let Ok(expenses) = repo.expenses_between(from, to) {
             self.expenses = expenses;
         }
+        if let Ok(incomes) = repo.incomes_between(from, to) {
+            self.incomes = incomes;
+        }
         if self.category_id.is_none() {
             self.category_id = self.categories.first().map(|category| category.id);
+        }
+        if self.income_category_id.is_none() {
+            self.income_category_id = self.income_categories.first().map(|category| category.id);
         }
         if self.payment_category_id.is_none() {
             self.payment_category_id = self.categories.first().map(|category| category.id);
@@ -171,6 +222,7 @@ impl AppState {
         self.feedback = None;
         self.toast = None;
         self.expense_rate_input.clear();
+        self.income_rate_input.clear();
     }
 
     pub fn clear_toast(&mut self) {
@@ -179,6 +231,11 @@ impl AppState {
 
     pub fn set_entry_currency(&mut self, currency: EntryCurrency) {
         self.entry_currency = currency;
+        self.feedback = None;
+    }
+
+    pub fn set_income_entry_currency(&mut self, currency: EntryCurrency) {
+        self.income_entry_currency = currency;
         self.feedback = None;
     }
 
@@ -198,18 +255,35 @@ impl AppState {
         self.rate_for(day).map(|(_, rate)| rate)
     }
 
-    pub fn to_usd(&self, cents: i64, day: NaiveDate) -> Option<i64> {
-        match self.entry_currency {
-            EntryCurrency::Usd => Some(cents),
-            EntryCurrency::Ves => self.rate_value_for(day).and_then(|rate| ves_to_usd(cents, rate)),
-        }
-    }
-
-    pub fn convert_amount(&self, cents: i64, rate: i64) -> Option<i64> {
-        match self.entry_currency {
+    fn convert_for(currency: EntryCurrency, cents: i64, rate: i64) -> Option<i64> {
+        match currency {
             EntryCurrency::Usd => Some(cents),
             EntryCurrency::Ves => ves_to_usd(cents, rate),
         }
+    }
+
+    pub fn to_usd(&self, cents: i64, day: NaiveDate) -> Option<i64> {
+        if self.entry_currency == EntryCurrency::Usd {
+            return Some(cents);
+        }
+        let rate = self.rate_value_for(day)?;
+        Self::convert_for(self.entry_currency, cents, rate)
+    }
+
+    pub fn convert_amount(&self, cents: i64, rate: i64) -> Option<i64> {
+        Self::convert_for(self.entry_currency, cents, rate)
+    }
+
+    pub fn income_to_usd(&self, cents: i64, day: NaiveDate) -> Option<i64> {
+        if self.income_entry_currency == EntryCurrency::Usd {
+            return Some(cents);
+        }
+        let rate = self.rate_value_for(day)?;
+        Self::convert_for(self.income_entry_currency, cents, rate)
+    }
+
+    pub fn convert_income_amount(&self, cents: i64, rate: i64) -> Option<i64> {
+        Self::convert_for(self.income_entry_currency, cents, rate)
     }
 
     pub fn update_rate_from_api(&mut self) {
@@ -313,7 +387,7 @@ impl AppState {
             amount,
             category_id,
             note: (!self.note.trim().is_empty()).then(|| self.note.trim().to_owned()),
-            spent_at: local_spent_at(day),
+            spent_at: local_moment_at(day),
             local_date: day,
             evidence_path: self.evidence_path.clone(),
             rate_cents,
@@ -357,6 +431,93 @@ impl AppState {
         }
     }
 
+    pub fn add_income(&mut self) {
+        let Some(cents) = parse_cents(&self.income_amount) else {
+            self.feedback = Some("Escribe un importe válido, por ejemplo 12.50".into());
+            return;
+        };
+        let day = NaiveDate::parse_from_str(&self.income_date, "%Y-%m-%d")
+            .unwrap_or_else(|_| Local::now().date_naive());
+        let raw_rate = self.income_rate_input.trim();
+        let manual_rate = if raw_rate.is_empty() {
+            None
+        } else {
+            match parse_cents(raw_rate) {
+                Some(rate) => Some(rate),
+                None => {
+                    self.feedback = Some("Escribe una tasa válida, por ejemplo 857,89".into());
+                    return;
+                }
+            }
+        };
+        let Some(usd_cents) = (match manual_rate {
+            Some(rate) => self.convert_income_amount(cents, rate),
+            None => self.income_to_usd(cents, day),
+        }) else {
+            self.feedback = Some("Configura la tasa del dólar para convertir bolívares".into());
+            return;
+        };
+        let Some(category_id) = self.income_category_id else {
+            self.feedback = Some("Elige una categoría de ingreso".into());
+            return;
+        };
+        let Ok(currency) = Currency::new(DEFAULT_CURRENCY) else {
+            return;
+        };
+        let Ok(amount) = Money::new(usd_cents, currency) else {
+            return;
+        };
+        let (rate_day, rate_cents) = match manual_rate {
+            Some(rate) => (Some(day), Some(rate)),
+            None => self.rate_for(day).unzip(),
+        };
+        let new = NewIncome {
+            amount,
+            category_id,
+            note: (!self.income_note.trim().is_empty())
+                .then(|| self.income_note.trim().to_owned()),
+            received_at: local_moment_at(day),
+            local_date: day,
+            rate_cents,
+            rate_day: rate_day.map(|value| value.to_string()),
+        };
+
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.insert_income(&new).map_err(|_| ()));
+
+        match result {
+            Ok(_) => {
+                if let Some(rate) = manual_rate {
+                    if let Ok(repo) = self.repo.lock() {
+                        let _ = repo.set_rate_for_day(day, rate, "manual_ingreso");
+                    }
+                }
+                self.income_amount.clear();
+                self.income_note.clear();
+                self.income_rate_input.clear();
+                self.refresh();
+                self.view = View::Home;
+                self.feedback = None;
+                self.toast = Some("Ingreso guardado".into());
+            }
+            Err(()) => self.feedback = Some("No se pudo guardar el ingreso".into()),
+        }
+    }
+
+    pub fn remove_income(&mut self, id: IncomeId) {
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.delete_income(id).map_err(|_| ()));
+        if result.is_ok() {
+            self.refresh();
+        }
+    }
+
     pub fn add_category(&mut self) {
         let name = self.new_category_name.trim().to_owned();
         if name.is_empty() {
@@ -380,6 +541,32 @@ impl AppState {
                 self.refresh();
             }
             Err(()) => self.feedback = Some("No se pudo crear la categoría".into()),
+        }
+    }
+
+    pub fn add_income_category(&mut self) {
+        let name = self.new_income_category_name.trim().to_owned();
+        if name.is_empty() {
+            self.feedback = Some("Escribe un nombre para la categoría de ingreso".into());
+            return;
+        }
+        let color = if self.new_income_category_color.trim().is_empty() {
+            "#2dd4a7".to_owned()
+        } else {
+            self.new_income_category_color.trim().to_owned()
+        };
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.add_income_category(&name, None, &color).map_err(|_| ()));
+        match result {
+            Ok(_) => {
+                self.new_income_category_name.clear();
+                self.feedback = Some("Categoría de ingreso creada".into());
+                self.refresh();
+            }
+            Err(()) => self.feedback = Some("No se pudo crear la categoría de ingreso".into()),
         }
     }
 
@@ -476,6 +663,10 @@ impl AppState {
         build_report(&self.expenses, &self.categories).ok()
     }
 
+    pub fn income_report(&self) -> Option<Report> {
+        build_income_report(&self.incomes, &self.income_categories).ok()
+    }
+
     pub fn month_total(&self) -> i64 {
         let now = Local::now();
         let (year, month) = (now.year(), now.month());
@@ -488,12 +679,36 @@ impl AppState {
             .sum()
     }
 
+    pub fn month_income_total(&self) -> i64 {
+        let now = Local::now();
+        let (year, month) = (now.year(), now.month());
+        self.incomes
+            .iter()
+            .filter(|income| {
+                income.local_date.year() == year && income.local_date.month() == month
+            })
+            .map(|income| income.amount.cents())
+            .sum()
+    }
+
+    pub fn month_balance(&self) -> i64 {
+        self.month_income_total() - self.month_total()
+    }
+
     pub fn recent(&self, limit: usize) -> Vec<Expense> {
         self.expenses.iter().take(limit).cloned().collect()
     }
 
+    pub fn income_recent(&self, limit: usize) -> Vec<Income> {
+        self.incomes.iter().take(limit).cloned().collect()
+    }
+
     pub fn category_of(&self, id: CategoryId) -> Option<&Category> {
         self.categories.iter().find(|category| category.id == id)
+    }
+
+    pub fn income_category_of(&self, id: CategoryId) -> Option<&Category> {
+        self.income_categories.iter().find(|category| category.id == id)
     }
 
     pub fn due_payments(&self) -> Vec<(RecurringPayment, PaymentStatus)> {
@@ -597,4 +812,27 @@ mod tests {
         let expenses = repo.expenses_between(day, day).unwrap();
         assert_eq!(expenses.len(), 1);
         assert_eq!(expenses[0].rate_cents, Some(12000));
-    }}
+    }
+
+    #[test]
+    fn adds_an_income_and_updates_the_balance() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+
+        state.income_amount = "25000000".into();
+        state.income_note = "sueldo".into();
+        state.add_income();
+
+        assert!(state.toast.is_some(), "feedback: {:?}", state.feedback);
+        assert_eq!(state.view, View::Home);
+        assert_eq!(state.month_income_total(), 25000000);
+        assert_eq!(state.month_balance(), 25000000);
+        assert_eq!(state.incomes.len(), 1);
+        assert_eq!(state.income_recent(1)[0].note.as_deref(), Some("sueldo"));
+
+        let id = state.incomes[0].id;
+        state.remove_income(id);
+        assert!(state.incomes.is_empty());
+        assert_eq!(state.month_balance(), 0);
+    }
+}

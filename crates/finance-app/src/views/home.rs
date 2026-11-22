@@ -33,6 +33,8 @@ pub fn Home(props: HomeProps) -> Element {
     let mut app_state = props.state;
     let state = app_state.read();
     let month_total = state.month_total();
+    let month_income = state.month_income_total();
+    let balance = state.month_balance();
     let rate = state.exchange_rate_cents;
     let due = state.due_payments();
     let report = state.report();
@@ -65,6 +67,7 @@ pub fn Home(props: HomeProps) -> Element {
         .map(|report| report.by_category.clone())
         .unwrap_or_default();
     let chart_total = report.as_ref().map(|report| report.total.cents()).unwrap_or(0);
+    let balance_class = if balance >= 0 { "balance-positive" } else { "balance-negative" };
     drop(state);
 
     rsx! {
@@ -92,7 +95,35 @@ pub fn Home(props: HomeProps) -> Element {
                 if let Some(ves) = money_ves(month_total, rate) {
                     p { class: "secondary-amount", "{ves}" }
                 }
-                button { class: "primary", onclick: move |_| props.go_add.call(()), "+ Añadir gasto" }
+                div { class: "row-buttons",
+                    button { class: "primary", onclick: move |_| props.go_add.call(()), "+ Añadir gasto" }
+                    button { class: "chip", onclick: move |_| app_state.write().set_view(View::AddIncome),
+                        "+ Ingreso"
+                    }
+                }
+            }
+
+            div { class: "card",
+                h3 { "Resumen del mes" }
+                div { class: "summary-grid",
+                    div {
+                        span { class: "muted", "Ingresos" }
+                        strong { "{money_usd(month_income)}" }
+                    }
+                    div {
+                        span { class: "muted", "Gastos" }
+                        strong { "{money_usd(month_total)}" }
+                    }
+                    div {
+                        span { class: "muted", "Balance" }
+                        strong { class: balance_class, "{money_usd(balance)}" }
+                    }
+                }
+                button {
+                    class: "link",
+                    onclick: move |_| app_state.write().set_view(View::Income),
+                    "Ver ingresos →"
+                }
             }
 
             div { class: "card",

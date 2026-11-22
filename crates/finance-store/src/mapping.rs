@@ -1,6 +1,7 @@
 use chrono::{DateTime, NaiveDate};
 use finance_core::{
-    Category, CategoryId, Currency, Expense, ExpenseId, Money, RecurringPayment, RecurringPaymentId,
+    Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money, RecurringPayment,
+    RecurringPaymentId,
 };
 use rusqlite::{types::Type, Error, Row};
 
@@ -36,6 +37,27 @@ pub fn expense_from_row(row: &Row<'_>) -> Result<Expense, Error> {
         spent_at,
         local_date,
         evidence_path: row.get("evidence_path")?,
+        rate_cents: row.get("rate_cents")?,
+        rate_day: row.get("rate_day")?,
+    })
+}
+
+pub fn income_from_row(row: &Row<'_>) -> Result<Income, Error> {
+    let cents: i64 = row.get("amount_cents")?;
+    let currency: String = row.get("currency")?;
+    let currency = Currency::new(&currency).map_err(conversion)?;
+    let received_at: String = row.get("received_at")?;
+    let received_at = DateTime::parse_from_rfc3339(&received_at).map_err(conversion)?;
+    let local_date: String = row.get("local_date")?;
+    let local_date = NaiveDate::parse_from_str(&local_date, "%Y-%m-%d").map_err(conversion)?;
+
+    Ok(Income {
+        id: IncomeId::new(row.get("id")?),
+        amount: Money::from_cents(cents, currency),
+        category_id: CategoryId::new(row.get("category_id")?),
+        note: row.get("note")?,
+        received_at,
+        local_date,
         rate_cents: row.get("rate_cents")?,
         rate_day: row.get("rate_day")?,
     })

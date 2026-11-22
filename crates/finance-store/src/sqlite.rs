@@ -2,8 +2,9 @@ use std::path::Path;
 
 use chrono::{Datelike, NaiveDate, Utc};
 use finance_core::{
-    build_report, category::validate_name, Category, CategoryId, Expense, ExpenseId, NewExpense,
-    NewRecurringPayment, RecurringPayment, RecurringPaymentId, Report,
+    build_income_report, build_report, category::validate_name, Category, CategoryId, Expense,
+    ExpenseId, Income, IncomeId, NewExpense, NewIncome, NewRecurringPayment, RecurringPayment,
+    RecurringPaymentId, Report,
 };
 use rusqlite::{params, Connection};
 use rusqlite_migration::{M, Migrations};
@@ -14,6 +15,7 @@ const MIGRATIONS: &[M<'_>] = &[
     M::up(include_str!("../migrations/0001_init.sql")),
     M::up(include_str!("../migrations/0002_recurring_payments.sql")),
     M::up(include_str!("../migrations/0003_expense_metadata.sql")),
+    M::up(include_str!("../migrations/0004_income.sql")),
 ];
 
 pub struct SqliteRepository {
@@ -84,6 +86,86 @@ impl SqliteRepository {
             .conn
             .execute("DELETE FROM expenses WHERE id = ?1", params![id.get()])?;
         Ok(deleted > 0)
+    }
+
+    pub fn add_income_category(
+        &self,
+        name: &str,
+        icon: Option<&str>,
+        color: &str,
+    ) -> Result<CategoryId, StoreError> {
+        validate_name(name)?;
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO income_categories (name, icon, color, created_at) VALUES (?1, ?2, ?3, ?4)",
+            params![name.trim(), icon, color, now],
+        )?;
+        Ok(CategoryId::new(self.conn.last_insert_rowid()))
+    }
+
+    pub fn income_categories(&self) -> Result<Vec<Category>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, icon, color, is_active, sort_order
+             FROM income_categories ORDER BY sort_order, name",
+        )?;
+        let rows = stmt.query_map([], mapping::category_from_row)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(StoreError::from)
+    }
+
+    pub fn insert_income(&self, new: &NewIncome) -> Result<IncomeId, StoreError> {
+        new.validate()?;
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO incomes
+             (amount_cents, currency, category_id, note, received_at, local_date,
+              rate_cents, rate_day, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                new.amount.cents(),
+                new.amount.currency().as_str(),
+                new.category_id.get(),
+                new.note,
+                new.received_at.to_rfc3339(),
+                new.local_date.to_string(),
+                new.rate_cents,
+                new.rate_day,
+                now,
+                now,
+            ],
+        )?;
+        Ok(IncomeId::new(self.conn.last_insert_rowid()))
+    }
+
+    pub fn incomes_between(
+        &self,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> Result<Vec<Income>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, amount_cents, currency, category_id, note, received_at, local_date,
+                    rate_cents, rate_day
+             FROM incomes WHERE local_date BETWEEN ?1 AND ?2
+             ORDER BY local_date DESC, id DESC",
+        )?;
+        let rows = stmt.query_map(params![from.to_string(), to.to_string()], mapping::income_from_row)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(StoreError::from)
+    }
+
+    pub fn delete_income(&self, id: IncomeId) -> Result<bool, StoreError> {
+        let deleted = self
+            .conn
+            .execute("DELETE FROM incomes WHERE id = ?1", params![id.get()])?;
+        Ok(deleted > 0)
+    }
+
+    pub fn income_report_between(
+        &self,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> Result<Report, StoreError> {
+        let incomes = self.incomes_between(from, to)?;
+        let categories = self.income_categories()?;
+        Ok(build_income_report(&incomes, &categories)?)
     }
 
     pub fn report_between(
