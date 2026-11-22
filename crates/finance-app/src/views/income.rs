@@ -1,6 +1,9 @@
 use dioxus::prelude::*;
 
-use crate::state::{money_usd, money_ves, AppState, View};
+use crate::{
+    components::icon::{icon_for_category, Icon},
+    state::{money_usd, money_ves, AppState, View},
+};
 
 #[derive(Props, Clone, PartialEq)]
 pub struct IncomeProps {
@@ -27,9 +30,10 @@ pub fn Incomes(props: IncomeProps) -> Element {
                 .unwrap_or(rate);
             (
                 income.id,
-                category
-                    .and_then(|category| category.icon.clone())
-                    .unwrap_or_else(|| "💵".into()),
+                icon_for_category(
+                    category.map(|category| category.name.as_str()).unwrap_or("Ingresos"),
+                    category.and_then(|category| category.icon.as_deref()),
+                ),
                 category
                     .map(|category| category.name.clone())
                     .unwrap_or_else(|| "Otros".into()),
@@ -80,7 +84,7 @@ pub fn Incomes(props: IncomeProps) -> Element {
                 } else {
                     for (id, icon, category, note, date, amount, secondary) in rows {
                         div { class: "expense-row",
-                            div { class: "expense-icon", "{icon}" }
+                            div { class: "expense-icon", Icon { name: icon, class: "row-icon" } }
                             div { class: "expense-info",
                                 strong { "{category}" }
                                 if let Some(note) = note {

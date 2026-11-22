@@ -1,10 +1,8 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::charts::Donut,
-    state::{
-        money_usd, money_ves, payment_status_text, AppState, View,
-    },
+    components::{charts::Donut, icon::{icon_for_category, Icon}},
+    state::{money_usd, money_ves, payment_status_text, AppState, View},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -14,18 +12,12 @@ pub struct HomeProps {
 }
 
 struct RecentRow {
-    icon: String,
+    icon: &'static str,
     category: String,
     date: String,
     amount: String,
     secondary: Option<String>,
     evidence: bool,
-}
-
-impl RecentRow {
-    fn evidence_label(&self) -> &'static str {
-        if self.evidence { " · 📎" } else { "" }
-    }
 }
 
 #[component]
@@ -49,9 +41,10 @@ pub fn Home(props: HomeProps) -> Element {
                 .or_else(|| state.rate_value_for(expense.local_date))
                 .unwrap_or(rate);
             RecentRow {
-                icon: category
-                    .and_then(|category| category.icon.clone())
-                    .unwrap_or_else(|| "📦".into()),
+                icon: icon_for_category(
+                    category.map(|category| category.name.as_str()).unwrap_or("Otros"),
+                    category.and_then(|category| category.icon.as_deref()),
+                ),
                 category: category
                     .map(|category| category.name.clone())
                     .unwrap_or_else(|| "Otros".into()),
@@ -153,10 +146,15 @@ pub fn Home(props: HomeProps) -> Element {
                 } else {
                     for expense in recent {
                         div { class: "expense-row",
-                            div { class: "expense-icon", "{expense.icon}" }
+                            div { class: "expense-icon", Icon { name: expense.icon, class: "row-icon" } }
                             div { class: "expense-info",
                                 strong { "{expense.category}" }
-                                small { class: "muted", "{expense.date}{expense.evidence_label()}" }
+                                small { class: "muted",
+                                    "{expense.date}"
+                                    if expense.evidence {
+                                        Icon { name: "paperclip", class: "inline-icon" }
+                                    }
+                                }
                                 if let Some(secondary) = expense.secondary {
                                     small { class: "muted", "{secondary}" }
                                 }

@@ -2,7 +2,10 @@ use chrono::{Local, NaiveDate};
 use dioxus::prelude::*;
 use finance_core::{format_cents_input, format_rate, CategoryId};
 
-use crate::state::{money_usd, money_ves, parse_cents, AppState, EntryCurrency};
+use crate::{
+    components::icon::{icon_for_category, Icon},
+    state::{money_usd, money_ves, parse_cents, AppState, EntryCurrency},
+};
 
 #[derive(Props, Clone, PartialEq)]
 pub struct AddIncomeProps {
@@ -12,6 +15,7 @@ pub struct AddIncomeProps {
 #[derive(Props, Clone, PartialEq)]
 struct IncomeChipProps {
     id: CategoryId,
+    icon: &'static str,
     label: String,
     active: bool,
     state: Signal<AppState>,
@@ -26,7 +30,8 @@ fn IncomeChip(props: IncomeChipProps) -> Element {
         button {
             class: class,
             onclick: move |_| { state.write().income_category_id = Some(id); },
-            "{props.label}"
+            Icon { name: props.icon, class: "chip-icon" }
+            span { "{props.label}" }
         }
     }
 }
@@ -58,11 +63,8 @@ pub fn AddIncome(props: AddIncomeProps) -> Element {
         .iter()
         .map(|category| IncomeChipProps {
             id: category.id,
-            label: format!(
-                "{} {}",
-                category.icon.as_deref().unwrap_or("📦"),
-                category.name
-            ),
+            icon: icon_for_category(&category.name, category.icon.as_deref()),
+            label: category.name.clone(),
             active: selected == Some(category.id),
             state,
         })

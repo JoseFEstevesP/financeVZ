@@ -2,7 +2,10 @@ use chrono::{Local, NaiveDate};
 use dioxus::prelude::*;
 use finance_core::{format_cents_input, format_rate, CategoryId};
 
-use crate::state::{money_usd, money_ves, parse_cents, AppState, EntryCurrency};
+use crate::{
+    components::icon::{icon_for_category, Icon},
+    state::{money_usd, money_ves, parse_cents, AppState, EntryCurrency},
+};
 
 #[derive(Props, Clone, PartialEq)]
 pub struct AddProps {
@@ -12,6 +15,7 @@ pub struct AddProps {
 #[derive(Props, Clone, PartialEq)]
 struct ChipProps {
     id: CategoryId,
+    icon: &'static str,
     label: String,
     active: bool,
     state: Signal<AppState>,
@@ -26,7 +30,8 @@ fn Chip(props: ChipProps) -> Element {
         button {
             class: class,
             onclick: move |_| { state.write().category_id = Some(id); },
-            "{props.label}"
+            Icon { name: props.icon, class: "chip-icon" }
+            span { "{props.label}" }
         }
     }
 }
@@ -59,11 +64,8 @@ pub fn Add(props: AddProps) -> Element {
         .iter()
         .map(|category| ChipProps {
             id: category.id,
-            label: format!(
-                "{} {}",
-                category.icon.as_deref().unwrap_or("📦"),
-                category.name
-            ),
+            icon: icon_for_category(&category.name, category.icon.as_deref()),
+            label: category.name.clone(),
             active: selected == Some(category.id),
             state,
         })
@@ -154,15 +156,25 @@ pub fn Add(props: AddProps) -> Element {
                 }
 
                 label { class: "field-label", "Evidencia (opcional)" }
-                input {
-                    id: "evidence-file",
-                    class: "file-input",
-                    r#type: "file",
-                    accept: "image/*",
+                label { class: "file-drop",
+                    span { class: "file-drop-icon", Icon { name: "camera", class: "icon" } }
+                    span { class: "file-drop-copy",
+                        strong { "Adjuntar imagen" }
+                        small { class: "muted", "Toca para elegir una foto" }
+                    }
+                    input {
+                        id: "evidence-file",
+                        class: "file-input-native",
+                        r#type: "file",
+                        accept: "image/*",
+                    }
                 }
                 if let Some(name) = evidence_name {
                     div { class: "evidence-row",
-                        span { class: "grow muted", "📎 {name}" }
+                        span { class: "grow muted",
+                            Icon { name: "paperclip", class: "inline-icon" }
+                            "{name}"
+                        }
                         button { class: "link small-link", onclick: move |_| state.write().clear_evidence(),
                             "Quitar"
                         }

@@ -1,6 +1,9 @@
 use dioxus::prelude::*;
 
-use crate::state::AppState;
+use crate::{
+    components::icon::{icon_for_category, Icon},
+    state::AppState,
+};
 
 #[derive(Props, Clone, PartialEq)]
 pub struct CategoriesProps {
@@ -8,7 +11,7 @@ pub struct CategoriesProps {
 }
 
 struct CategoryRow {
-    icon: String,
+    icon: &'static str,
     name: String,
     color: String,
 }
@@ -21,7 +24,7 @@ pub fn Categories(props: CategoriesProps) -> Element {
         .categories
         .iter()
         .map(|category| CategoryRow {
-            icon: category.icon.clone().unwrap_or_else(|| "📦".to_owned()),
+            icon: icon_for_category(&category.name, category.icon.as_deref()),
             name: category.name.clone(),
             color: category.color.clone(),
         })
@@ -30,7 +33,7 @@ pub fn Categories(props: CategoriesProps) -> Element {
         .income_categories
         .iter()
         .map(|category| CategoryRow {
-            icon: category.icon.clone().unwrap_or_else(|| "💵".to_owned()),
+            icon: icon_for_category(&category.name, category.icon.as_deref()),
             name: category.name.clone(),
             color: category.color.clone(),
         })
@@ -49,7 +52,7 @@ pub fn Categories(props: CategoriesProps) -> Element {
                 for category in categories {
                     div { class: "category-row",
                         span { class: "dot", style: "background: {category.color};" }
-                        span { "{category.icon}" }
+                        Icon { name: category.icon, class: "icon" }
                         span { class: "grow", "{category.name}" }
                     }
                 }
@@ -60,7 +63,7 @@ pub fn Categories(props: CategoriesProps) -> Element {
                 for category in income_categories {
                     div { class: "category-row",
                         span { class: "dot", style: "background: {category.color};" }
-                        span { "{category.icon}" }
+                        Icon { name: category.icon, class: "icon" }
                         span { class: "grow", "{category.name}" }
                     }
                 }

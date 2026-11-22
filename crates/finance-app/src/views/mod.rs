@@ -5,3 +5,4 @@ pub mod home;
 pub mod income;
 pub mod payments;
 pub mod reports;
+pub mod update;
