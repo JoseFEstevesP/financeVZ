@@ -1,18 +1,19 @@
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate};
+use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate};
 use finance_core::{
     build_income_report, build_report, format_cents_input, format_money, format_rate, usd_to_ves,
     ves_to_usd, Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money,
-    NewExpense, NewIncome, NewRecurringPayment, PaymentStatus, RecurringPayment, RecurringPaymentId,
-    Report,
+    NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus, RecurringPayment,
+    RecurringPaymentId, Report,
 };
 use finance_store::SqliteRepository;
 
-use crate::platform;
+use crate::platform::{self, UpdateProgress};
 
 pub const DEFAULT_CURRENCY: &str = "USD";
 const RATE_SETTING: &str = "exchange_rate_cents";
+const UPDATE_URL_SETTING: &str = "update_url";
 
 fn local_moment_at(day: NaiveDate) -> DateTime<FixedOffset> {
     let now = Local::now();
@@ -32,6 +33,13 @@ pub enum View {
     Reports,
     Categories,
     Payments,
+    Update,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaymentKind {
+    Monthly,
+    OneTime,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,9 +98,18 @@ pub struct AppState {
     pub payment_name: String,
     pub payment_amount: String,
     pub payment_day: String,
+    pub payment_kind: PaymentKind,
+    pub payment_date: String,
+    pub payment_method: PaymentMethod,
+    pub payment_note: String,
+    pub cashea_initial: String,
+    pub cashea_installments: String,
+    pub cashea_installment: String,
     pub payment_category_id: Option<CategoryId>,
     pub feedback: Option<String>,
     pub toast: Option<String>,
+    pub update_url: String,
+    pub update_status: Option<String>,
 }
 
 impl AppState {
@@ -128,9 +145,18 @@ impl AppState {
             payment_name: String::new(),
             payment_amount: String::new(),
             payment_day: String::new(),
+            payment_kind: PaymentKind::Monthly,
+            payment_date: Local::now().date_naive().to_string(),
+            payment_method: PaymentMethod::Other,
+            payment_note: String::new(),
+            cashea_initial: String::new(),
+            cashea_installments: "3".to_owned(),
+            cashea_installment: String::new(),
             payment_category_id: None,
             feedback: None,
             toast: None,
+            update_url: String::new(),
+            update_status: None,
         };
         state.seed_categories();
         state.seed_income_categories();
@@ -198,6 +224,11 @@ impl AppState {
         if self.rate_input.is_empty() {
             self.rate_input = input_from_cents(self.exchange_rate_cents);
         }
+        if self.update_url.is_empty() {
+            if let Ok(Some(url)) = repo.get_setting(UPDATE_URL_SETTING) {
+                self.update_url = url;
+            }
+        }
         let from = NaiveDate::from_ymd_opt(2000, 1, 1).expect("valid date");
         let to = NaiveDate::from_ymd_opt(2100, 12, 31).expect("valid date");
         if let Ok(expenses) = repo.expenses_between(from, to) {
@@ -227,6 +258,49 @@ impl AppState {
 
     pub fn clear_toast(&mut self) {
         self.toast = None;
+    }
+
+    pub fn set_update_url(&mut self, value: String) {
+        self.update_url = value;
+        self.update_status = None;
+    }
+
+    /// El importe de una compra Cashea es la inicial más todas las cuotas.
+    pub fn sync_cashea_total(&mut self) {
+        let initial = self.cashea_initial.trim().parse::<i64>().unwrap_or(0);
+        let count = self
+            .cashea_installments
+            .trim()
+            .parse::<i64>()
+            .unwrap_or(0)
+            .clamp(0, 12);
+        let installment = self.cashea_installment.trim().parse::<i64>().unwrap_or(0);
+        self.payment_amount = (initial + count * installment).to_string();
+    }
+
+    pub fn prepare_update(&mut self) -> Result<String, String> {
+        let base = self.update_url.trim().trim_end_matches('/').to_owned();
+        if !(base.starts_with("http://") || base.starts_with("https://")) {
+            return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
+        }
+        if let Ok(repo) = self.repo.lock() {
+            let _ = repo.set_setting(UPDATE_URL_SETTING, &base);
+        }
+        Ok(base)
+    }
+
+    pub fn update_app(&mut self, progress: &(dyn Fn(UpdateProgress) + Send + Sync)) {
+        let base = match self.prepare_update() {
+            Ok(base) => base,
+            Err(message) => {
+                self.update_status = Some(message);
+                return;
+            }
+        };
+        self.update_status = Some("Buscando actualización…".into());
+        self.update_status = Some(match platform::install_update(&base, progress) {
+            Ok(message) | Err(message) => message,
+        });
     }
 
     pub fn set_entry_currency(&mut self, currency: EntryCurrency) {
@@ -576,6 +650,13 @@ impl AppState {
             self.feedback = Some("Escribe el nombre del pago, por ejemplo Luz".into());
             return;
         }
+        let Some(category_id) = self.payment_category_id else {
+            self.feedback = Some("Elige una categoría".into());
+            return;
+        };
+        if self.payment_method == PaymentMethod::Cashea {
+            return self.add_cashea_payment(name, category_id);
+        }
         let Some(cents) = parse_cents(&self.payment_amount) else {
             self.feedback = Some("Escribe un importe válido".into());
             return;
@@ -584,13 +665,25 @@ impl AppState {
             self.feedback = Some("Configura la tasa del dólar para convertir bolívares".into());
             return;
         };
-        let Ok(day) = self.payment_day.trim().parse::<u8>() else {
-            self.feedback = Some("Escribe el día de vencimiento (1-31)".into());
-            return;
-        };
-        let Some(category_id) = self.payment_category_id else {
-            self.feedback = Some("Elige una categoría".into());
-            return;
+        let (due_day, due_date) = match self.payment_kind {
+            PaymentKind::Monthly => {
+                let Ok(day) = self.payment_day.trim().parse::<u8>() else {
+                    self.feedback = Some("Escribe el día de vencimiento (1-31)".into());
+                    return;
+                };
+                if !(1..=31).contains(&day) {
+                    self.feedback = Some("El día debe estar entre 1 y 31".into());
+                    return;
+                }
+                (day, None)
+            }
+            PaymentKind::OneTime => {
+                let Ok(date) = NaiveDate::parse_from_str(&self.payment_date, "%Y-%m-%d") else {
+                    self.feedback = Some("Elige la fecha del pago".into());
+                    return;
+                };
+                (date.day() as u8, Some(date))
+            }
         };
         let Ok(currency) = Currency::new(DEFAULT_CURRENCY) else {
             return;
@@ -598,12 +691,16 @@ impl AppState {
         let Ok(amount) = Money::new(usd_cents, currency) else {
             return;
         };
+        let note = self.payment_note.trim();
+        let note = (!note.is_empty()).then(|| note.to_owned());
         let payment = NewRecurringPayment {
             name,
             amount,
             category_id,
-            due_day: day,
-            note: None,
+            due_day,
+            due_date,
+            method: self.payment_method,
+            note,
         };
         let result = self
             .repo
@@ -615,11 +712,118 @@ impl AppState {
                 self.payment_name.clear();
                 self.payment_amount.clear();
                 self.payment_day.clear();
-                self.feedback = Some("Pago mensual creado".into());
+                self.payment_note.clear();
+                self.feedback = Some(match self.payment_kind {
+                    PaymentKind::Monthly => "Pago mensual creado".into(),
+                    PaymentKind::OneTime => "Pago en fecha única creado".into(),
+                });
                 self.refresh();
             }
             Err(()) => self.feedback = Some("No se pudo crear el pago".into()),
         }
+    }
+
+    pub fn add_cashea_payment(&mut self, name: String, category_id: CategoryId) {
+        let Some(initial) = parse_cents(&self.cashea_initial) else {
+            self.feedback = Some("Escribe el pago inicial".into());
+            return;
+        };
+        let Ok(count) = self.cashea_installments.trim().parse::<u8>() else {
+            self.feedback = Some("Escribe cuántas cuotas (1-12)".into());
+            return;
+        };
+        if !(1..=12).contains(&count) {
+            self.feedback = Some("Las cuotas deben estar entre 1 y 12".into());
+            return;
+        }
+        let Some(installment) = parse_cents(&self.cashea_installment) else {
+            self.feedback = Some("Escribe el monto de cada cuota".into());
+            return;
+        };
+        let today = Local::now().date_naive();
+        let Some((_, initial_rate)) = self.rate_for(today) else {
+            self.feedback = Some("Configura la tasa del dólar para convertir bolívares".into());
+            return;
+        };
+        let Ok(currency) = Currency::new(DEFAULT_CURRENCY) else {
+            return;
+        };
+        let detail = self.payment_note.trim();
+
+        let mut initial_ok = false;
+        if let Some(usd) = self.convert_amount(initial, initial_rate) {
+            if let Ok(amount) = Money::new(usd, currency.clone()) {
+                let new = NewExpense {
+                    amount,
+                    category_id,
+                    note: Some(format!("{name} · inicial Cashea")),
+                    spent_at: local_moment_at(today),
+                    local_date: today,
+                    evidence_path: None,
+                    rate_cents: Some(initial_rate),
+                    rate_day: self.rate_for(today).map(|(day, _)| day.to_string()),
+                };
+                initial_ok = self
+                    .repo
+                    .lock()
+                    .map_err(|_| ())
+                    .and_then(|repo| repo.insert_expense(&new).map_err(|_| ()))
+                    .is_ok();
+            }
+        }
+
+        let mut created = 0usize;
+        let mut failed = 0usize;
+        for index in 1..=count {
+            let due = today + Duration::days(14 * index as i64);
+            let Some((rate_day, usd_rate)) = self.rate_for(due) else {
+                failed += 1;
+                continue;
+            };
+            let Some(usd) = self.convert_amount(installment, usd_rate) else {
+                failed += 1;
+                continue;
+            };
+            let Ok(amount) = Money::new(usd, currency.clone()) else {
+                failed += 1;
+                continue;
+            };
+            let note = if detail.is_empty() {
+                format!("Cuota {index}/{count}")
+            } else {
+                format!("Cuota {index}/{count} · {detail} (tasa {rate_day})")
+            };
+            let payment = NewRecurringPayment {
+                name: format!("{name} · cuota {index}/{count}"),
+                amount,
+                category_id,
+                due_day: due.day() as u8,
+                due_date: Some(due),
+                method: PaymentMethod::Cashea,
+                note: Some(note),
+            };
+            match self
+                .repo
+                .lock()
+                .map_err(|_| ())
+                .and_then(|repo| repo.add_recurring_payment(&payment).map_err(|_| ()))
+            {
+                Ok(_) => created += 1,
+                Err(()) => failed += 1,
+            }
+        }
+        self.payment_name.clear();
+        self.cashea_initial.clear();
+        self.cashea_installments = "3".to_owned();
+        self.cashea_installment.clear();
+        self.payment_note.clear();
+        self.payment_amount.clear();
+        self.feedback = Some(if failed == 0 && initial_ok {
+            format!("Cashea: inicial + {created} cuotas creadas cada 14 días")
+        } else {
+            format!("Cashea: {created} cuotas creadas, {failed} fallidas")
+        });
+        self.refresh();
     }
 
     pub fn pay_payment(&mut self, id: RecurringPaymentId) {
@@ -628,10 +832,17 @@ impl AppState {
         };
         let now = Local::now();
         let (rate_day, rate_cents) = self.rate_for(now.date_naive()).unzip();
+        let detail = payment.note.as_deref().unwrap_or("").trim();
+        let kind = if payment.is_one_time() { "pago único" } else { "pago mensual" };
+        let note = if detail.is_empty() {
+            format!("{} ({} · {})", payment.name, kind, payment.method.label())
+        } else {
+            format!("{} · {} ({} · {})", payment.name, detail, kind, payment.method.label())
+        };
         let new = NewExpense {
             amount: payment.amount,
             category_id: payment.category_id,
-            note: Some(format!("{} (pago mensual)", payment.name)),
+            note: Some(note),
             spent_at: now.fixed_offset(),
             local_date: now.date_naive(),
             evidence_path: None,
@@ -743,7 +954,7 @@ pub fn input_from_cents(cents: i64) -> String {
 
 pub fn payment_status_text(status: PaymentStatus) -> String {
     match status {
-        PaymentStatus::Paid => "Pagado este mes".into(),
+        PaymentStatus::Paid => "Pagado".into(),
         PaymentStatus::Pending(days) => format!("Vence en {days} días"),
         PaymentStatus::DueSoon(0) => "Vence hoy".into(),
         PaymentStatus::DueSoon(days) => format!("Vence en {days} días"),
@@ -812,6 +1023,55 @@ mod tests {
         let expenses = repo.expenses_between(day, day).unwrap();
         assert_eq!(expenses.len(), 1);
         assert_eq!(expenses[0].rate_cents, Some(12000));
+    }
+
+    #[test]
+    fn cashea_inputs_add_up_to_the_purchase_total() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+        state.cashea_initial = "1000".into();
+        state.cashea_installments = "3".into();
+        state.cashea_installment = "5000".into();
+        state.sync_cashea_total();
+        assert_eq!(state.payment_amount, "16000");
+        state.cashea_installments = "abc".into();
+        state.sync_cashea_total();
+        assert_eq!(state.payment_amount, "1000");
+    }
+
+    #[test]
+    fn cashea_creates_initial_expense_and_installments_every_14_days() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+        let today = Local::now().date_naive();
+        state
+            .repo
+            .lock()
+            .unwrap()
+            .set_rate_for_day(today, 10000, "test")
+            .unwrap();
+        state.refresh();
+        let category = state.categories[0].id;
+        state.payment_name = "Nevera".into();
+        state.payment_note = "prueba".into();
+        state.cashea_initial = "10000".into();
+        state.cashea_installments = "3".into();
+        state.cashea_installment = "5000".into();
+
+        state.add_cashea_payment("Nevera".into(), category);
+
+        assert!(state.feedback.as_deref().unwrap_or("").contains("3 cuotas"), "{:?}", state.feedback);
+        let repo = state.repo.lock().unwrap();
+        assert_eq!(repo.expenses_between(today, today).unwrap().len(), 1);
+        let payments = repo.recurring_payments().unwrap();
+        assert_eq!(payments.len(), 3);
+        assert!(payments.iter().all(|p| p.method == PaymentMethod::Cashea));
+        assert!(payments.iter().all(|p| p.is_one_time()));
+        let mut dates: Vec<_> = payments.iter().filter_map(|p| p.due_date).collect();
+        dates.sort();
+        assert_eq!(dates[0], today + Duration::days(14));
+        assert_eq!(dates[1], today + Duration::days(28));
+        assert_eq!(dates[2], today + Duration::days(42));
     }
 
     #[test]

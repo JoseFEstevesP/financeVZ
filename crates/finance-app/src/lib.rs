@@ -9,10 +9,11 @@ use std::sync::OnceLock;
 use dioxus::prelude::*;
 use finance_store::SqliteRepository;
 
+use components::icon::Icon;
 use state::{AppState, View};
 use views::{
     add::Add, add_income::AddIncome, categories::Categories, home::Home, income::Incomes,
-    payments::Payments, reports::Reports,
+    payments::Payments, reports::Reports, update::Update,
 };
 
 static APP_STATE: OnceLock<AppState> = OnceLock::new();
@@ -22,6 +23,7 @@ pub fn run() {
     let path = platform::database_path().expect("ruta de base de datos");
     log::info!("base de datos: {path:?}");
     let repo = SqliteRepository::open(&path).expect("abrir base de datos");
+    platform::cleanup_update_files();
     let mut state = AppState::new(repo);
     state.update_rate_from_api();
     let _ = APP_STATE.set(state);
@@ -46,7 +48,7 @@ fn Tab(props: TabProps) -> Element {
         button {
             class: class,
             onclick: move |_| app_state.write().set_view(target),
-            span { class: "tab-icon", "{props.icon}" }
+            Icon { name: props.icon, class: "tab-icon" }
             span { "{props.label}" }
         }
     }
@@ -75,13 +77,17 @@ fn App() -> Element {
         View::Reports => rsx! { Reports { state: app_state } },
         View::Categories => rsx! { Categories { state: app_state } },
         View::Payments => rsx! { Payments { state: app_state } },
+        View::Update => rsx! { Update { state: app_state } },
     };
 
     rsx! {
         style { "{STYLES}" }
         div { class: "shell",
             header { class: "topbar",
-                div { class: "brand",
+                button {
+                    class: "brand",
+                    aria_label: "Ir a Inicio",
+                    onclick: move |_| app_state.write().set_view(View::Home),
                     svg { class: "brand-mark", view_box: "0 0 256 256",
                         path { d: BRAND_SYMBOL_PATH, fill: "currentColor" }
                     }
@@ -94,12 +100,10 @@ fn App() -> Element {
                 div { class: "toast", role: "status", "{message}" }
             }
             nav { class: "bottom-nav",
-                Tab { target: View::Home, label: "Inicio", icon: "🏠", active: view == View::Home, app_state }
-                Tab { target: View::Income, label: "Ingresos", icon: "💵", active: view == View::Income || view == View::AddIncome, app_state }
-                Tab { target: View::Add, label: "Añadir", icon: "➕", active: view == View::Add, app_state }
-                Tab { target: View::Reports, label: "Reportes", icon: "📊", active: view == View::Reports, app_state }
-                Tab { target: View::Categories, label: "Categorías", icon: "🏷️", active: view == View::Categories, app_state }
-                Tab { target: View::Payments, label: "Pagos", icon: "🧾", active: view == View::Payments, app_state }
+                Tab { target: View::Reports, label: "Reportes", icon: "reports", active: view == View::Reports, app_state }
+                Tab { target: View::Categories, label: "Categorías", icon: "categories", active: view == View::Categories, app_state }
+                Tab { target: View::Payments, label: "Pagos", icon: "payments", active: view == View::Payments, app_state }
+                Tab { target: View::Update, label: "Actualizar", icon: "update", active: view == View::Update, app_state }
             }
         }
     }
@@ -114,7 +118,9 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .shell { height: 100dvh; min-height: 100dvh; display: flex; flex-direction: column; }
 .topbar { display: flex; align-items: center; justify-content: space-between;
   padding: calc(18px + env(safe-area-inset-top)) 20px 12px; border-bottom: 1px solid #222b3d; }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; background: none; border: 0;
+  color: inherit; padding: 0; cursor: pointer; text-align: left; }
+.brand:hover { opacity: .85; }
 .brand-mark { width: 28px; height: 28px; color: #2dd4a7; flex-shrink: 0; }
 .topbar h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
 .badge { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
@@ -140,7 +146,8 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   border: 1px solid #2b3752; border-radius: 12px; padding: 12px 14px; font-size: 15px; }
 .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .chip { background: #0e1421; color: #c7d2e8; border: 1px solid #2b3752;
-  border-radius: 12px; padding: 11px; font-size: 14px; cursor: pointer; text-align: left; }
+  border-radius: 12px; padding: 11px; font-size: 14px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 8px; }
 .chip.active { border-color: #4f8cff; background: #17294b; color: #fff; }
 .donut-wrap { width: 190px; height: 190px; margin: 0 auto 12px; }
 .legend { display: flex; flex-direction: column; gap: 8px; }
@@ -169,14 +176,46 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.45); white-space: nowrap; }
 .bottom-nav { display: flex; border-top: 1px solid #222b3d; background: #121826;
   padding-bottom: env(safe-area-inset-bottom); }
-.file-input { width: 100%; color: #93a0b8; background: #0e1421; border: 1px dashed #2b3752;
+.file-drop { position: relative; display: flex; align-items: center; gap: 12px;
+  background: #0e1421; border: 1px dashed #39517d; border-radius: 14px;
+  padding: 13px 14px; cursor: pointer; overflow: hidden; }
+.file-drop:active { border-color: #4f8cff; background: #14213a; }
+.file-drop-icon { width: 40px; height: 40px; flex: none; display: grid; place-items: center;
+  background: #17294b; border-radius: 12px; font-size: 18px; }
+.file-drop-copy { display: flex; flex-direction: column; gap: 3px; }
+.file-drop-copy strong { color: #eef2fb; font-size: 14px; }
+.file-drop-copy small { font-size: 12px; }
+.file-input-native { position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer; }
+.evidence-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 13px;
+  background: #14213a; border: 1px solid #2c4a86; border-radius: 12px; padding: 10px 12px; }
+.update-input { width: 100%; color: #eef2fb; background: #0e1421; border: 1px solid #2b3752;
   border-radius: 12px; padding: 12px 14px; font-size: 14px; }
-.evidence-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 13px; }
+.secondary { background: #17294b; color: #dce8ff; border: 1px solid #2c4a86;
+  border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.update-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.update-status { color: #8fb4ff; font-size: 13px; margin: 0; }
+.progress-track { width: 100%; height: 10px; background: #0e1421; border: 1px solid #2b3752;
+  border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #4f8cff, #2f5fb8);
+  border-radius: 999px; transition: width .2s ease; }
+.progress-fill.indeterminate { width: 35% !important; animation: progress-slide 1.2s ease-in-out infinite; }
+@keyframes progress-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(310%); } }
 .tab { flex: 1; background: none; border: 0; color: #93a0b8; padding: 11px 1px 13px;
   display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px;
   cursor: pointer; }
 .tab.active { color: #8fb4ff; }
-.tab-icon { font-size: 18px; }
+.tab-icon { width: 24px; height: 24px; }
+.tab .tab-icon { opacity: .55; }
+.tab.active .tab-icon { opacity: 1; }
+.icon { width: 20px; height: 20px; display: block; flex: none; }
+.row-icon { width: 30px; height: 30px; }
+.chip-icon { width: 20px; height: 20px; }
+.inline-icon { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-left: 4px; }
+.icon-button { background: none; border: 0; padding: 4px; cursor: pointer;
+  display: grid; place-items: center; color: #93a0b8; }
+.icon-button:hover { color: #eef2fb; }
+.icon-button .icon { width: 16px; height: 16px; }
 .alert { background: #3a2415; border: 1px solid #8a5a24; border-radius: 16px; padding: 14px 16px; }
 .alert-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-top: 8px; }
 .urgent { color: #ffb38a; }

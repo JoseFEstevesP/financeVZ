@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build Android con el icono de marca aplicado. Uso: scripts/build-android.sh [target]
+# Build Android con icono de marca, versionCode creciente y APK listo para el servidor local.
+# Uso: scripts/build-android.sh [target]
 set -euo pipefail
 
 ROOT="$(env -u CDPATH cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,9 +14,43 @@ export JAVA_HOME="$HOME/.local/share/financeVZ-toolchain/jdk"
 TARGET="${1:-aarch64-linux-android}"
 cd "$ROOT"
 
-bash scripts/install-brand-icon.sh
-dx build --android -p finance-app --target "$TARGET"
-bash scripts/install-brand-icon.sh
+GEN="$ROOT/target/dx/finance-app/debug/android/app"
+ANDROID_RES="$ROOT/crates/finance-app/android/res/xml"
+ANDROID_KOTLIN="$ROOT/crates/finance-app/android/kotlin/dev/dioxus/main/MainActivity.kt"
+VERSION_FILE="$ROOT/crates/finance-app/android/version-code.txt"
+UPDATES="$ROOT/updates"
 
-APK="$ROOT/target/dx/finance-app/debug/android/app/app/build/outputs/apk/debug/app-debug.apk"
+LAST_CODE="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
+[[ "$LAST_CODE" =~ ^[0-9]+$ ]] || LAST_CODE=1
+CODE=$((LAST_CODE + 1))
+VERSION_NAME="0.1.$CODE"
+
+mkdir -p "$GEN/app/src/main/res/xml"
+cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
+cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+
+bash scripts/install-brand-icon.sh "$GEN"
+dx build --android -p finance-app --target "$TARGET"
+
+# dx regenera el Gradle en cada build: subimos versionCode para que Android acepte la actualización.
+GRADLE="$GEN/app/build.gradle.kts"
+sed -i -E "s/versionCode = [0-9]+/versionCode = $CODE/; s/versionName = \"[^\"]*\"/versionName = \"$VERSION_NAME\"/" "$GRADLE"
+grep -q "versionCode = $CODE" "$GRADLE"
+grep -q "versionName = \"$VERSION_NAME\"" "$GRADLE"
+
+cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
+cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+cp "$ANDROID_KOTLIN" "$GEN/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+bash scripts/install-brand-icon.sh "$GEN"
+(cd "$GEN" && ./gradlew assembleDebug)
+
+APK="$GEN/app/build/outputs/apk/debug/app-debug.apk"
+mkdir -p "$UPDATES"
+cp "$APK" "$UPDATES/financevz.apk"
+printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk"}\n' "$CODE" "$VERSION_NAME" > "$UPDATES/update.json"
+printf '%s\n' "$CODE" > "$VERSION_FILE"
+
+IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo "APK listo: $APK"
+echo "Servidor: python3 scripts/serve-update.sh"
+echo "URL para el botón Actualizar: http://${IP:-192.168.0.10}:8000"
