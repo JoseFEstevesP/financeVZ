@@ -45,7 +45,7 @@ cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
 dx build --android -p finance-app --target "$TARGET"
 
 GRADLE="$GEN/app/build.gradle.kts"
-APP_GRADLE="$GEN/app/app/build.gradle.kts"
+APP_GRADLE="$GRADLE"
 sed -i -E "s/versionCode = [0-9]+/versionCode = $CODE/; s/versionName = \"[^\"]*\"/versionName = \"$VERSION_NAME\"/" "$APP_GRADLE"
 bash scripts/patch-android-gradle.sh "$APP_GRADLE"
 
