@@ -1,8 +1,8 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::icon::{icon_for_category, Icon},
-    state::{money_usd, money_ves, AppState, View},
+    components::icon::{Icon, icon_for_category},
+    state::{AppState, View, format_date, money_usd, money_ves},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -31,14 +31,16 @@ pub fn Incomes(props: IncomeProps) -> Element {
             (
                 income.id,
                 icon_for_category(
-                    category.map(|category| category.name.as_str()).unwrap_or("Ingresos"),
+                    category
+                        .map(|category| category.name.as_str())
+                        .unwrap_or("Ingresos"),
                     category.and_then(|category| category.icon.as_deref()),
                 ),
                 category
                     .map(|category| category.name.clone())
                     .unwrap_or_else(|| "Otros".into()),
                 income.note.clone(),
-                income.local_date.to_string(),
+                format_date(income.local_date),
                 money_usd(cents),
                 money_ves(cents, income_rate),
             )
@@ -46,7 +48,11 @@ pub fn Incomes(props: IncomeProps) -> Element {
         .collect();
     drop(state);
 
-    let balance_class = if balance >= 0 { "balance-positive" } else { "balance-negative" };
+    let balance_class = if balance >= 0 {
+        "balance-positive"
+    } else {
+        "balance-negative"
+    };
 
     rsx! {
         div { class: "page",
@@ -97,9 +103,16 @@ pub fn Incomes(props: IncomeProps) -> Element {
                             }
                             span { class: "expense-amount", "{amount}" }
                             button {
-                                class: "link small-link",
+                                class: "icon-button",
+                                aria_label: "Editar ingreso",
+                                onclick: move |_| app_state.write().begin_edit_income(id),
+                                Icon { name: "edit", class: "icon" }
+                            }
+                            button {
+                                class: "icon-button",
+                                aria_label: "Eliminar ingreso",
                                 onclick: move |_| app_state.write().remove_income(id),
-                                "Eliminar"
+                                Icon { name: "delete", class: "icon" }
                             }
                         }
                     }

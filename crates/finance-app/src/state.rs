@@ -1,19 +1,50 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration as StdDuration,
+};
 
 use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate};
 use finance_core::{
-    build_income_report, build_report, format_cents_input, format_money, format_rate, usd_to_ves,
-    ves_to_usd, Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money,
-    NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus, RecurringPayment,
-    RecurringPaymentId, Report,
+    Backup, Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money,
+    NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus, RecurringKind,
+    RecurringPayment, RecurringPaymentId, Report, build_income_report, build_report,
+    format_cents_input, format_money, format_rate, usd_to_ves, ves_to_usd,
 };
 use finance_store::SqliteRepository;
+use sha2::{Digest, Sha256};
 
-use crate::platform::{self, UpdateProgress};
+use crate::{bridge, platform, platform::UpdateProgress};
 
 pub const DEFAULT_CURRENCY: &str = "USD";
 const RATE_SETTING: &str = "exchange_rate_cents";
 const UPDATE_URL_SETTING: &str = "update_url";
+const PIN_HASH_SETTING: &str = "app_pin_hash";
+const TEXT_SCALE_SETTING: &str = "text_scale";
+const THEME_SETTING: &str = "theme";
+const BIOMETRIC_SETTING: &str = "biometric_enabled";
+const AUTO_BACKUP_INTERVAL_SETTING: &str = "auto_backup_hours";
+const LAST_AUTO_BACKUP_SETTING: &str = "last_auto_backup_at";
+
+pub fn sha256_hex(value: &str) -> String {
+    let digest = Sha256::digest(value.as_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Formato venezolano: dd/mm/aaaa.
+pub fn format_date(day: NaiveDate) -> String {
+    day.format("%d/%m/%Y").to_string()
+}
+
+fn format_timestamp(seconds: i64) -> String {
+    DateTime::from_timestamp(seconds, 0)
+        .map(|moment| {
+            moment
+                .with_timezone(&Local)
+                .format("%d/%m/%Y %H:%M")
+                .to_string()
+        })
+        .unwrap_or_else(|| "desconocida".to_owned())
+}
 
 fn local_moment_at(day: NaiveDate) -> DateTime<FixedOffset> {
     let now = Local::now();
@@ -34,6 +65,8 @@ pub enum View {
     Categories,
     Payments,
     Update,
+    Search,
+    Settings,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,6 +143,29 @@ pub struct AppState {
     pub toast: Option<String>,
     pub update_url: String,
     pub update_status: Option<String>,
+    pub editing_expense: Option<ExpenseId>,
+    pub editing_income: Option<IncomeId>,
+    pub budgets: Vec<(CategoryId, i64)>,
+    pub budget_category_id: Option<CategoryId>,
+    pub budget_input: String,
+    pub search_query: String,
+    pub search_category_id: Option<CategoryId>,
+    pub search_from: String,
+    pub search_to: String,
+    pub import_input: String,
+    pub pin_hash: Option<String>,
+    pub pin_input: String,
+    pub setup_pin: String,
+    pub confirm_pin: String,
+    pub pin_error: Option<String>,
+    pub locked: bool,
+    pub text_scale: String,
+    pub theme: String,
+    pub biometric_enabled: bool,
+    pub auto_backup_hours: i64,
+    pub evidence_viewer: Option<String>,
+    pub rate_history: Vec<(NaiveDate, i64, String, String)>,
+    pub recurring_kind: RecurringKind,
 }
 
 impl AppState {
@@ -157,7 +213,56 @@ impl AppState {
             toast: None,
             update_url: String::new(),
             update_status: None,
+            editing_expense: None,
+            editing_income: None,
+            budgets: Vec::new(),
+            budget_category_id: None,
+            budget_input: String::new(),
+            search_query: String::new(),
+            search_category_id: None,
+            search_from: String::new(),
+            search_to: String::new(),
+            import_input: String::new(),
+            pin_hash: None,
+            pin_input: String::new(),
+            setup_pin: String::new(),
+            confirm_pin: String::new(),
+            pin_error: None,
+            locked: false,
+            text_scale: "normal".to_owned(),
+            theme: "dark".to_owned(),
+            biometric_enabled: false,
+            auto_backup_hours: 12,
+            evidence_viewer: None,
+            rate_history: Vec::new(),
+            recurring_kind: RecurringKind::Payment,
         };
+        if let Ok(repo) = state.repo.lock() {
+            state.pin_hash = repo.get_setting(PIN_HASH_SETTING).ok().flatten();
+            state.text_scale = repo
+                .get_setting(TEXT_SCALE_SETTING)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "normal".to_owned());
+            state.theme = repo
+                .get_setting(THEME_SETTING)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "dark".to_owned());
+            state.biometric_enabled = repo
+                .get_setting(BIOMETRIC_SETTING)
+                .ok()
+                .flatten()
+                .as_deref()
+                == Some("1");
+            state.auto_backup_hours = repo
+                .get_setting(AUTO_BACKUP_INTERVAL_SETTING)
+                .ok()
+                .flatten()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(12);
+        }
+        state.locked = state.pin_hash.is_some();
         state.seed_categories();
         state.seed_income_categories();
         state.refresh();
@@ -194,7 +299,11 @@ impl AppState {
         let Ok(repo) = self.repo.lock() else {
             return;
         };
-        if repo.income_categories().map(|c| c.is_empty()).unwrap_or(false) {
+        if repo
+            .income_categories()
+            .map(|c| c.is_empty())
+            .unwrap_or(false)
+        {
             for (name, icon, color) in seeds {
                 let _ = repo.add_income_category(name, Some(icon), color);
             }
@@ -214,6 +323,18 @@ impl AppState {
         if let Ok(payments) = repo.recurring_payments() {
             self.payments = payments;
         }
+        if let Ok(budgets) = repo.budgets() {
+            self.budgets = budgets;
+        }
+        if let Ok(history) = repo.rate_details() {
+            self.rate_history = history;
+        }
+        if self.budget_category_id.is_none() {
+            self.budget_category_id = self.categories.first().map(|category| category.id);
+        }
+        if self.search_category_id.is_none() {
+            self.search_category_id = self.categories.first().map(|category| category.id);
+        }
         if let Ok(Some(rate)) = repo.get_setting(RATE_SETTING) {
             self.exchange_rate_cents = rate.parse().unwrap_or(0);
         }
@@ -224,10 +345,10 @@ impl AppState {
         if self.rate_input.is_empty() {
             self.rate_input = input_from_cents(self.exchange_rate_cents);
         }
-        if self.update_url.is_empty() {
-            if let Ok(Some(url)) = repo.get_setting(UPDATE_URL_SETTING) {
-                self.update_url = url;
-            }
+        if self.update_url.is_empty()
+            && let Ok(Some(url)) = repo.get_setting(UPDATE_URL_SETTING)
+        {
+            self.update_url = url;
         }
         let from = NaiveDate::from_ymd_opt(2000, 1, 1).expect("valid date");
         let to = NaiveDate::from_ymd_opt(2100, 12, 31).expect("valid date");
@@ -254,6 +375,9 @@ impl AppState {
         self.toast = None;
         self.expense_rate_input.clear();
         self.income_rate_input.clear();
+        self.editing_expense = None;
+        self.editing_income = None;
+        self.evidence_viewer = None;
     }
 
     pub fn clear_toast(&mut self) {
@@ -320,9 +444,8 @@ impl AppState {
             .lock()
             .ok()
             .and_then(|repo| repo.rate_on(day).ok().flatten());
-        historic.or_else(|| {
-            (self.exchange_rate_cents > 0).then(|| (day, self.exchange_rate_cents))
-        })
+        historic
+            .or_else(|| (self.exchange_rate_cents > 0).then_some((day, self.exchange_rate_cents)))
     }
 
     pub fn rate_value_for(&self, day: NaiveDate) -> Option<i64> {
@@ -458,7 +581,7 @@ impl AppState {
             None => self.rate_for(day).unzip(),
         };
         let new = NewExpense {
-            amount,
+            amount: amount.clone(),
             category_id,
             note: (!self.note.trim().is_empty()).then(|| self.note.trim().to_owned()),
             spent_at: local_moment_at(day),
@@ -468,27 +591,52 @@ impl AppState {
             rate_day: rate_day.map(|value| value.to_string()),
         };
 
-        let result = self
-            .repo
-            .lock()
-            .map_err(|_| ())
-            .and_then(|repo| repo.insert_expense(&new).map_err(|_| ()));
+        let editing = self.editing_expense;
+        let result = if let Some(id) = editing {
+            match self.expenses.iter().find(|item| item.id == id).cloned() {
+                Some(mut expense) => {
+                    expense.amount = amount.clone();
+                    expense.category_id = category_id;
+                    expense.note = new.note.clone();
+                    expense.spent_at = new.spent_at;
+                    expense.local_date = new.local_date;
+                    expense.evidence_path = new.evidence_path.clone();
+                    expense.rate_cents = new.rate_cents;
+                    expense.rate_day = new.rate_day.clone();
+                    self.repo
+                        .lock()
+                        .map_err(|_| ())
+                        .and_then(|repo| repo.update_expense(&expense).map(|_| ()).map_err(|_| ()))
+                }
+                None => Err(()),
+            }
+        } else {
+            self.repo
+                .lock()
+                .map_err(|_| ())
+                .and_then(|repo| repo.insert_expense(&new).map(|_| ()).map_err(|_| ()))
+        };
 
         match result {
             Ok(_) => {
-                if let Some(rate) = manual_rate {
-                    if let Ok(repo) = self.repo.lock() {
-                        let _ = repo.set_rate_for_day(day, rate, "manual_gasto");
-                    }
+                if let Some(rate) = manual_rate
+                    && let Ok(repo) = self.repo.lock()
+                {
+                    let _ = repo.set_rate_for_day(day, rate, "manual_gasto");
                 }
                 self.amount.clear();
                 self.note.clear();
                 self.expense_rate_input.clear();
                 self.clear_evidence();
+                self.editing_expense = None;
                 self.refresh();
                 self.view = View::Home;
                 self.feedback = None;
-                self.toast = Some("Gasto guardado".into());
+                self.toast = Some(if editing.is_some() {
+                    "Gasto actualizado".into()
+                } else {
+                    "Gasto guardado".into()
+                });
             }
             Err(()) => self.feedback = Some("No se pudo guardar el gasto".into()),
         }
@@ -546,36 +694,59 @@ impl AppState {
             None => self.rate_for(day).unzip(),
         };
         let new = NewIncome {
-            amount,
+            amount: amount.clone(),
             category_id,
-            note: (!self.income_note.trim().is_empty())
-                .then(|| self.income_note.trim().to_owned()),
+            note: (!self.income_note.trim().is_empty()).then(|| self.income_note.trim().to_owned()),
             received_at: local_moment_at(day),
             local_date: day,
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
         };
 
-        let result = self
-            .repo
-            .lock()
-            .map_err(|_| ())
-            .and_then(|repo| repo.insert_income(&new).map_err(|_| ()));
+        let editing = self.editing_income;
+        let result = if let Some(id) = editing {
+            match self.incomes.iter().find(|item| item.id == id).cloned() {
+                Some(mut income) => {
+                    income.amount = amount.clone();
+                    income.category_id = category_id;
+                    income.note = new.note.clone();
+                    income.received_at = new.received_at;
+                    income.local_date = new.local_date;
+                    income.rate_cents = new.rate_cents;
+                    income.rate_day = new.rate_day.clone();
+                    self.repo
+                        .lock()
+                        .map_err(|_| ())
+                        .and_then(|repo| repo.update_income(&income).map(|_| ()).map_err(|_| ()))
+                }
+                None => Err(()),
+            }
+        } else {
+            self.repo
+                .lock()
+                .map_err(|_| ())
+                .and_then(|repo| repo.insert_income(&new).map(|_| ()).map_err(|_| ()))
+        };
 
         match result {
             Ok(_) => {
-                if let Some(rate) = manual_rate {
-                    if let Ok(repo) = self.repo.lock() {
-                        let _ = repo.set_rate_for_day(day, rate, "manual_ingreso");
-                    }
+                if let Some(rate) = manual_rate
+                    && let Ok(repo) = self.repo.lock()
+                {
+                    let _ = repo.set_rate_for_day(day, rate, "manual_ingreso");
                 }
                 self.income_amount.clear();
                 self.income_note.clear();
                 self.income_rate_input.clear();
+                self.editing_income = None;
                 self.refresh();
                 self.view = View::Home;
                 self.feedback = None;
-                self.toast = Some("Ingreso guardado".into());
+                self.toast = Some(if editing.is_some() {
+                    "Ingreso actualizado".into()
+                } else {
+                    "Ingreso guardado".into()
+                });
             }
             Err(()) => self.feedback = Some("No se pudo guardar el ingreso".into()),
         }
@@ -629,11 +800,10 @@ impl AppState {
         } else {
             self.new_income_category_color.trim().to_owned()
         };
-        let result = self
-            .repo
-            .lock()
-            .map_err(|_| ())
-            .and_then(|repo| repo.add_income_category(&name, None, &color).map_err(|_| ()));
+        let result = self.repo.lock().map_err(|_| ()).and_then(|repo| {
+            repo.add_income_category(&name, None, &color)
+                .map_err(|_| ())
+        });
         match result {
             Ok(_) => {
                 self.new_income_category_name.clear();
@@ -694,6 +864,7 @@ impl AppState {
         let note = self.payment_note.trim();
         let note = (!note.is_empty()).then(|| note.to_owned());
         let payment = NewRecurringPayment {
+            kind: self.recurring_kind,
             name,
             amount,
             category_id,
@@ -751,25 +922,25 @@ impl AppState {
         let detail = self.payment_note.trim();
 
         let mut initial_ok = false;
-        if let Some(usd) = self.convert_amount(initial, initial_rate) {
-            if let Ok(amount) = Money::new(usd, currency.clone()) {
-                let new = NewExpense {
-                    amount,
-                    category_id,
-                    note: Some(format!("{name} · inicial Cashea")),
-                    spent_at: local_moment_at(today),
-                    local_date: today,
-                    evidence_path: None,
-                    rate_cents: Some(initial_rate),
-                    rate_day: self.rate_for(today).map(|(day, _)| day.to_string()),
-                };
-                initial_ok = self
-                    .repo
-                    .lock()
-                    .map_err(|_| ())
-                    .and_then(|repo| repo.insert_expense(&new).map_err(|_| ()))
-                    .is_ok();
-            }
+        if let Some(usd) = self.convert_amount(initial, initial_rate)
+            && let Ok(amount) = Money::new(usd, currency.clone())
+        {
+            let new = NewExpense {
+                amount,
+                category_id,
+                note: Some(format!("{name} · inicial Cashea")),
+                spent_at: local_moment_at(today),
+                local_date: today,
+                evidence_path: None,
+                rate_cents: Some(initial_rate),
+                rate_day: self.rate_for(today).map(|(day, _)| day.to_string()),
+            };
+            initial_ok = self
+                .repo
+                .lock()
+                .map_err(|_| ())
+                .and_then(|repo| repo.insert_expense(&new).map_err(|_| ()))
+                .is_ok();
         }
 
         let mut created = 0usize;
@@ -794,6 +965,7 @@ impl AppState {
                 format!("Cuota {index}/{count} · {detail} (tasa {rate_day})")
             };
             let payment = NewRecurringPayment {
+                kind: RecurringKind::Payment,
                 name: format!("{name} · cuota {index}/{count}"),
                 amount,
                 category_id,
@@ -827,17 +999,32 @@ impl AppState {
     }
 
     pub fn pay_payment(&mut self, id: RecurringPaymentId) {
-        let Some(payment) = self.payments.iter().find(|payment| payment.id == id).cloned() else {
+        let Some(payment) = self
+            .payments
+            .iter()
+            .find(|payment| payment.id == id)
+            .cloned()
+        else {
             return;
         };
         let now = Local::now();
         let (rate_day, rate_cents) = self.rate_for(now.date_naive()).unzip();
         let detail = payment.note.as_deref().unwrap_or("").trim();
-        let kind = if payment.is_one_time() { "pago único" } else { "pago mensual" };
+        let kind = if payment.is_one_time() {
+            "pago único"
+        } else {
+            "pago mensual"
+        };
         let note = if detail.is_empty() {
             format!("{} ({} · {})", payment.name, kind, payment.method.label())
         } else {
-            format!("{} · {} ({} · {})", payment.name, detail, kind, payment.method.label())
+            format!(
+                "{} · {} ({} · {})",
+                payment.name,
+                detail,
+                kind,
+                payment.method.label()
+            )
         };
         let new = NewExpense {
             amount: payment.amount,
@@ -849,9 +1036,11 @@ impl AppState {
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
         };
-        let result = self.repo.lock().map_err(|_| ()).and_then(|repo| {
-            repo.pay_recurring_payment(id, &new).map_err(|_| ())
-        });
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.pay_recurring_payment(id, &new).map_err(|_| ()));
         match result {
             Ok(()) => {
                 self.feedback = Some(format!("{} pagado y registrado", payment.name));
@@ -862,11 +1051,449 @@ impl AppState {
     }
 
     pub fn remove_payment(&mut self, id: RecurringPaymentId) {
-        let result = self.repo.lock().map_err(|_| ()).and_then(|repo| {
-            repo.delete_recurring_payment(id).map_err(|_| ())
-        });
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.delete_recurring_payment(id).map_err(|_| ()));
         if result.is_ok() {
             self.refresh();
+        }
+    }
+
+    pub fn begin_edit_expense(&mut self, id: ExpenseId) {
+        let Some(expense) = self.expenses.iter().find(|item| item.id == id).cloned() else {
+            return;
+        };
+        self.editing_expense = Some(id);
+        self.editing_income = None;
+        self.amount = format_cents_input(&expense.amount.cents().to_string(), "USD");
+        self.note = expense.note.clone().unwrap_or_default();
+        self.expense_date = expense.local_date.to_string();
+        self.category_id = Some(expense.category_id);
+        self.entry_currency = EntryCurrency::Usd;
+        self.expense_rate_input = expense.rate_cents.map(input_from_cents).unwrap_or_default();
+        self.evidence_path = expense.evidence_path.clone();
+        self.evidence_name = expense
+            .evidence_path
+            .as_deref()
+            .and_then(|path| path.rsplit('/').next())
+            .map(str::to_owned);
+        self.feedback = None;
+        self.view = View::Add;
+    }
+
+    pub fn begin_edit_income(&mut self, id: IncomeId) {
+        let Some(income) = self.incomes.iter().find(|item| item.id == id).cloned() else {
+            return;
+        };
+        self.editing_income = Some(id);
+        self.editing_expense = None;
+        self.income_amount = format_cents_input(&income.amount.cents().to_string(), "USD");
+        self.income_note = income.note.clone().unwrap_or_default();
+        self.income_date = income.local_date.to_string();
+        self.income_category_id = Some(income.category_id);
+        self.income_entry_currency = EntryCurrency::Usd;
+        self.income_rate_input = income.rate_cents.map(input_from_cents).unwrap_or_default();
+        self.feedback = None;
+        self.view = View::AddIncome;
+    }
+
+    pub fn cancel_edit(&mut self) {
+        self.editing_expense = None;
+        self.editing_income = None;
+        self.amount.clear();
+        self.note.clear();
+        self.income_amount.clear();
+        self.income_note.clear();
+        self.clear_evidence();
+        self.view = View::Home;
+    }
+
+    pub fn budget_for(&self, id: CategoryId) -> Option<i64> {
+        self.budgets
+            .iter()
+            .find(|(category_id, _)| *category_id == id)
+            .map(|(_, limit)| *limit)
+    }
+
+    pub fn spent_this_month(&self, id: CategoryId) -> i64 {
+        let now = Local::now();
+        self.expenses
+            .iter()
+            .filter(|expense| {
+                expense.category_id == id
+                    && expense.local_date.year() == now.year()
+                    && expense.local_date.month() == now.month()
+            })
+            .map(|expense| expense.amount.cents())
+            .sum()
+    }
+
+    pub fn save_budget(&mut self) {
+        let Some(category_id) = self.budget_category_id else {
+            self.feedback = Some("Elige una categoría".into());
+            return;
+        };
+        let Some(cents) = parse_cents(&self.budget_input) else {
+            self.feedback = Some("Escribe un límite válido, por ejemplo 100.00".into());
+            return;
+        };
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.set_budget(category_id, cents).map_err(|_| ()));
+        if result.is_ok() {
+            self.budget_input.clear();
+            self.feedback = Some("Presupuesto guardado".into());
+            self.refresh();
+        } else {
+            self.feedback = Some("No se pudo guardar el presupuesto".into());
+        }
+    }
+
+    pub fn remove_budget(&mut self, id: CategoryId) {
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.remove_budget(id).map_err(|_| ()));
+        if result.is_ok() {
+            self.refresh();
+        }
+    }
+
+    fn matches_search(&self, text: &str, category_id: CategoryId) -> bool {
+        let query = self.search_query.trim().to_lowercase();
+        if let Some(selected) = self.search_category_id
+            && selected != category_id
+        {
+            return false;
+        }
+        query.is_empty() || text.to_lowercase().contains(&query)
+    }
+
+    pub fn searched_expenses(&self) -> Vec<Expense> {
+        let from = self.search_from.trim();
+        let to = self.search_to.trim();
+        self.expenses
+            .iter()
+            .filter(|expense| {
+                let category = self
+                    .category_of(expense.category_id)
+                    .map(|c| c.name.as_str())
+                    .unwrap_or("");
+                if !self.matches_search(
+                    &format!("{} {}", expense.note.as_deref().unwrap_or(""), category),
+                    expense.category_id,
+                ) {
+                    return false;
+                }
+                if !from.is_empty() {
+                    let Ok(start) = NaiveDate::parse_from_str(from, "%Y-%m-%d") else {
+                        return false;
+                    };
+                    if expense.local_date < start {
+                        return false;
+                    }
+                }
+                if !to.is_empty() {
+                    let Ok(end) = NaiveDate::parse_from_str(to, "%Y-%m-%d") else {
+                        return false;
+                    };
+                    if expense.local_date > end {
+                        return false;
+                    }
+                }
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn searched_incomes(&self) -> Vec<Income> {
+        let from = self.search_from.trim();
+        let to = self.search_to.trim();
+        self.incomes
+            .iter()
+            .filter(|income| {
+                let category = self
+                    .income_category_of(income.category_id)
+                    .map(|c| c.name.as_str())
+                    .unwrap_or("");
+                if !self.matches_search(
+                    &format!("{} {}", income.note.as_deref().unwrap_or(""), category),
+                    income.category_id,
+                ) {
+                    return false;
+                }
+                if !from.is_empty() {
+                    let Ok(start) = NaiveDate::parse_from_str(from, "%Y-%m-%d") else {
+                        return false;
+                    };
+                    if income.local_date < start {
+                        return false;
+                    }
+                }
+                if !to.is_empty() {
+                    let Ok(end) = NaiveDate::parse_from_str(to, "%Y-%m-%d") else {
+                        return false;
+                    };
+                    if income.local_date > end {
+                        return false;
+                    }
+                }
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn export_backup_json(&mut self) -> Option<String> {
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| "No se pudo abrir la base de datos".to_owned())
+            .and_then(|repo| repo.export_backup().map_err(|error| error.to_string()));
+        match result.and_then(|backup| {
+            let summary = backup.summary();
+            serde_json::to_string_pretty(&backup)
+                .map(|json| (json, summary))
+                .map_err(|error| error.to_string())
+        }) {
+            Ok((json, summary)) => {
+                self.import_input = json.clone();
+                self.feedback = Some(format!("Copia preparada: {summary}."));
+                Some(json)
+            }
+            Err(error) => {
+                self.feedback = Some(format!("No se pudo exportar: {error}"));
+                None
+            }
+        }
+    }
+
+    pub fn import_backup_text(&mut self, json: &str) {
+        let backup: Backup = match serde_json::from_str(json) {
+            Ok(backup) => backup,
+            Err(error) => {
+                self.feedback = Some(format!("Copia no válida: {error}"));
+                return;
+            }
+        };
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| "No se pudo abrir la base de datos".to_owned())
+            .and_then(|repo| {
+                repo.import_backup(&backup)
+                    .map_err(|error| error.to_string())
+            });
+        match result {
+            Ok(()) => {
+                self.refresh();
+                self.feedback = Some(format!("Copia restaurada: {}.", backup.summary()));
+            }
+            Err(error) => self.feedback = Some(format!("No se pudo restaurar: {error}")),
+        }
+    }
+
+    pub fn set_pin(&mut self) {
+        let pin = self.setup_pin.trim();
+        if pin.len() != 4 || !pin.bytes().all(|byte| byte.is_ascii_digit()) {
+            self.pin_error = Some("El PIN debe tener 4 dígitos".into());
+            return;
+        }
+        if pin != self.confirm_pin.trim() {
+            self.pin_error = Some("Los PIN no coinciden".into());
+            return;
+        }
+        let hash = sha256_hex(pin);
+        let saved = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.set_setting(PIN_HASH_SETTING, &hash).map_err(|_| ()));
+        if saved.is_ok() {
+            self.pin_hash = Some(hash);
+            self.setup_pin.clear();
+            self.confirm_pin.clear();
+            self.pin_error = None;
+            self.feedback = Some("PIN activado".into());
+        } else {
+            self.pin_error = Some("No se pudo guardar el PIN".into());
+        }
+    }
+
+    pub fn remove_pin(&mut self) {
+        let hash = sha256_hex(self.pin_input.trim());
+        if self.pin_hash.as_deref() != Some(hash.as_str()) {
+            self.pin_error = Some("PIN incorrecto".into());
+            return;
+        }
+        let saved = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.set_setting(PIN_HASH_SETTING, "").map_err(|_| ()));
+        if saved.is_ok() {
+            self.pin_hash = None;
+            self.pin_input.clear();
+            self.pin_error = None;
+            self.feedback = Some("PIN desactivado".into());
+        }
+    }
+
+    pub fn unlock(&mut self) {
+        let hash = sha256_hex(self.pin_input.trim());
+        if self.pin_hash.as_deref() == Some(hash.as_str()) {
+            self.locked = false;
+            self.pin_input.clear();
+            self.pin_error = None;
+        } else {
+            self.pin_error = Some("PIN incorrecto".into());
+            self.pin_input.clear();
+        }
+    }
+
+    pub fn lock(&mut self) {
+        self.locked = self.pin_hash.is_some();
+        self.pin_input.clear();
+        self.evidence_viewer = None;
+    }
+
+    pub fn set_text_scale(&mut self, value: &str) {
+        let scale = match value {
+            "small" | "large" => value.to_owned(),
+            _ => "normal".to_owned(),
+        };
+        if let Ok(repo) = self.repo.lock() {
+            let _ = repo.set_setting(TEXT_SCALE_SETTING, &scale);
+        }
+        self.text_scale = scale;
+        self.feedback = Some("Tamaño de texto actualizado".into());
+    }
+
+    pub fn text_scale_factor(&self) -> f64 {
+        match self.text_scale.as_str() {
+            "small" => 0.92,
+            "large" => 1.14,
+            _ => 1.0,
+        }
+    }
+
+    pub fn is_light_theme(&self) -> bool {
+        self.theme == "light"
+    }
+
+    pub fn set_theme(&mut self, value: &str) {
+        let theme = if value == "light" { "light" } else { "dark" }.to_owned();
+        if let Ok(repo) = self.repo.lock() {
+            let _ = repo.set_setting(THEME_SETTING, &theme);
+        }
+        self.theme = theme;
+        self.feedback = Some("Tema actualizado".into());
+    }
+
+    pub fn request_biometric(&mut self, action: &str) {
+        if action == "enroll" && self.pin_hash.is_none() {
+            self.pin_error = Some("Activa el PIN antes de guardar la huella.".into());
+            return;
+        }
+        self.pin_error = None;
+        bridge::request_biometric(action);
+    }
+
+    pub fn finish_biometric(&mut self, action: &str, ok: bool, message: &str) {
+        if !ok {
+            self.pin_error = Some(if message.trim().is_empty() {
+                "No se pudo verificar la huella".to_owned()
+            } else {
+                message.to_owned()
+            });
+            return;
+        }
+        match action {
+            "enroll" => {
+                if let Ok(repo) = self.repo.lock() {
+                    let _ = repo.set_setting(BIOMETRIC_SETTING, "1");
+                }
+                self.biometric_enabled = true;
+                self.feedback = Some("Huella guardada. Podrás usarla al abrir la app.".into());
+            }
+            "unlock" => {
+                self.locked = false;
+                self.pin_input.clear();
+                self.pin_error = None;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn remove_biometric(&mut self) {
+        if let Ok(repo) = self.repo.lock() {
+            let _ = repo.set_setting(BIOMETRIC_SETTING, "");
+        }
+        self.biometric_enabled = false;
+        self.feedback = Some("Huella desactivada. El PIN sigue activo.".into());
+    }
+
+    pub fn set_auto_backup_hours(&mut self, hours: i64) {
+        let hours = hours.clamp(1, 168);
+        if let Ok(repo) = self.repo.lock() {
+            let _ = repo.set_setting(AUTO_BACKUP_INTERVAL_SETTING, &hours.to_string());
+        }
+        self.auto_backup_hours = hours;
+        self.feedback = Some(format!("Copia automática cada {hours} h."));
+    }
+
+    pub fn auto_backup_status(&self) -> String {
+        let last = self
+            .repo
+            .lock()
+            .ok()
+            .and_then(|repo| repo.get_setting(LAST_AUTO_BACKUP_SETTING).ok().flatten())
+            .and_then(|value| value.parse::<i64>().ok());
+        match last {
+            Some(seconds) => format!("Última copia automática: {}", format_timestamp(seconds)),
+            None => "Aún no se ha generado ninguna copia automática.".to_owned(),
+        }
+    }
+
+    pub fn auto_backup_now(&mut self) {
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| "No se pudo abrir la base de datos".to_owned())
+            .and_then(|repo| {
+                auto_backup(&repo, true).ok_or_else(|| "No se pudo guardar".to_owned())
+            });
+        self.feedback = Some(match result {
+            Ok(path) => format!("Copia automática guardada en {path}"),
+            Err(error) => format!("No se pudo crear la copia: {error}"),
+        });
+    }
+
+    pub fn show_evidence(&mut self, path: &str) {
+        self.evidence_viewer = platform::read_evidence_data_url(path);
+    }
+
+    pub fn close_evidence(&mut self) {
+        self.evidence_viewer = None;
+    }
+
+    pub fn latest_rate_label(&self) -> String {
+        match self.rate_history.first() {
+            Some((day, rate, source, _)) => {
+                let origin = match source.as_str() {
+                    "dolarapi" => "automática (DolarAPI)",
+                    value if value.starts_with("manual") => "manual",
+                    _ => source.as_str(),
+                };
+                format!("{} · {origin} · {}", format_date(*day), format_rate(*rate))
+            }
+            None => "Sin tasa registrada".into(),
         }
     }
 
@@ -895,9 +1522,7 @@ impl AppState {
         let (year, month) = (now.year(), now.month());
         self.incomes
             .iter()
-            .filter(|income| {
-                income.local_date.year() == year && income.local_date.month() == month
-            })
+            .filter(|income| income.local_date.year() == year && income.local_date.month() == month)
             .map(|income| income.amount.cents())
             .sum()
     }
@@ -919,7 +1544,9 @@ impl AppState {
     }
 
     pub fn income_category_of(&self, id: CategoryId) -> Option<&Category> {
-        self.income_categories.iter().find(|category| category.id == id)
+        self.income_categories
+            .iter()
+            .find(|category| category.id == id)
     }
 
     pub fn due_payments(&self) -> Vec<(RecurringPayment, PaymentStatus)> {
@@ -929,8 +1556,11 @@ impl AppState {
             .iter()
             .filter_map(|payment| {
                 let status = payment.status(today);
-                matches!(status, PaymentStatus::Overdue(_) | PaymentStatus::DueSoon(_))
-                    .then(|| (payment.clone(), status))
+                matches!(
+                    status,
+                    PaymentStatus::Overdue(_) | PaymentStatus::DueSoon(_)
+                )
+                .then(|| (payment.clone(), status))
             })
             .collect();
         items.sort_by_key(|(payment, _)| payment.due_date(today.year(), today.month()));
@@ -967,7 +1597,50 @@ pub fn money_usd(cents: i64) -> String {
 }
 
 pub fn money_ves(usd_cents: i64, rate_cents: i64) -> Option<String> {
-    usd_to_ves(usd_cents, rate_cents).map(|cents| format_money(cents, &Currency::new("VES").expect("VES válida")))
+    usd_to_ves(usd_cents, rate_cents)
+        .map(|cents| format_money(cents, &Currency::new("VES").expect("VES válida")))
+}
+
+/// Escribe una copia automática local si han pasado las horas configuradas.
+/// Devuelve la ruta cuando se creó una copia.
+pub fn auto_backup(repo: &SqliteRepository, force: bool) -> Option<String> {
+    let hours = repo
+        .get_setting(AUTO_BACKUP_INTERVAL_SETTING)
+        .ok()
+        .flatten()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(12)
+        .clamp(1, 168);
+    let now = Local::now().timestamp();
+    if !force {
+        let last = repo
+            .get_setting(LAST_AUTO_BACKUP_SETTING)
+            .ok()
+            .flatten()
+            .and_then(|value| value.parse::<i64>().ok())
+            .unwrap_or(0);
+        if now - last < hours * 3600 {
+            return None;
+        }
+    }
+    let backup = repo.export_backup().ok()?;
+    let json = serde_json::to_string(&backup).ok()?;
+    let path = platform::write_auto_backup(&json, 3)?;
+    let _ = repo.set_setting(LAST_AUTO_BACKUP_SETTING, &now.to_string());
+    log::info!("copia automática guardada en {path}");
+    Some(path)
+}
+
+/// Revisa periódicamente si toca una copia automática mientras la app está abierta.
+pub fn start_auto_backup_loop(repo: Arc<Mutex<SqliteRepository>>) {
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(StdDuration::from_secs(600));
+            if let Ok(guard) = repo.lock() {
+                let _ = auto_backup(&guard, false);
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -989,6 +1662,12 @@ mod tests {
         assert_eq!(money_usd(123456), "USD 1,234.56");
         assert_eq!(money_ves(100, 85789).as_deref(), Some("Bs.S 857,89"));
         assert_eq!(money_ves(1000, 0), None);
+    }
+
+    #[test]
+    fn formats_visible_dates_for_venezuela() {
+        let day = NaiveDate::from_ymd_opt(2026, 11, 5).expect("fecha válida");
+        assert_eq!(format_date(day), "05/11/2026");
     }
 
     #[test]
@@ -1060,7 +1739,11 @@ mod tests {
 
         state.add_cashea_payment("Nevera".into(), category);
 
-        assert!(state.feedback.as_deref().unwrap_or("").contains("3 cuotas"), "{:?}", state.feedback);
+        assert!(
+            state.feedback.as_deref().unwrap_or("").contains("3 cuotas"),
+            "{:?}",
+            state.feedback
+        );
         let repo = state.repo.lock().unwrap();
         assert_eq!(repo.expenses_between(today, today).unwrap().len(), 1);
         let payments = repo.recurring_payments().unwrap();

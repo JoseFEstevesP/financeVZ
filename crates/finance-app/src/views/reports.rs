@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::charts::{Bars, Donut},
-    state::{money_usd, money_ves, AppState},
+    state::{AppState, format_date, money_usd, money_ves},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -37,7 +37,12 @@ pub fn Reports(props: ReportsProps) -> Element {
     let rate_input = snapshot.rate_input.clone();
     let feedback = snapshot.feedback.clone();
     let secondary = money_ves(total, rate);
-    let balance_class = if balance >= 0 { "balance-positive" } else { "balance-negative" };
+    let balance_class = if balance >= 0 {
+        "balance-positive"
+    } else {
+        "balance-negative"
+    };
+    let rate_history: Vec<_> = snapshot.rate_history.iter().take(8).cloned().collect();
     drop(snapshot);
 
     rsx! {
@@ -108,6 +113,16 @@ pub fn Reports(props: ReportsProps) -> Element {
                 }
                 if rate > 0 {
                     p { class: "muted", "Bs por USD: {rate / 100},{rate % 100:02}" }
+                }
+                if !rate_history.is_empty() {
+                    h4 { class: "subheading", "Historial" }
+                    for (day, cents, source, _) in rate_history {
+                        div { class: "category-row",
+                            span { class: "grow", "{format_date(day)}" }
+                            span { "{cents / 100},{cents % 100:02}" }
+                            small { class: "muted", "{source}" }
+                        }
+                    }
                 }
                 if let Some(message) = feedback {
                     p { class: "feedback", "{message}" }

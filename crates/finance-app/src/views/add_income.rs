@@ -1,10 +1,10 @@
 use chrono::{Local, NaiveDate};
 use dioxus::prelude::*;
-use finance_core::{format_cents_input, format_rate, CategoryId};
+use finance_core::{CategoryId, format_cents_input, format_rate};
 
 use crate::{
-    components::icon::{icon_for_category, Icon},
-    state::{money_usd, money_ves, parse_cents, AppState, EntryCurrency},
+    components::icon::{Icon, icon_for_category},
+    state::{AppState, EntryCurrency, money_usd, money_ves, parse_cents},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -70,12 +70,13 @@ pub fn AddIncome(props: AddIncomeProps) -> Element {
         })
         .collect();
     let feedback = snapshot.feedback.clone();
+    let editing = snapshot.editing_income.is_some();
     drop(snapshot);
 
     rsx! {
         div { class: "page",
             div { class: "card",
-                h3 { "Nuevo ingreso" }
+                h3 { if editing { "Editar ingreso" } else { "Nuevo ingreso" } }
 
                 label { class: "field-label", "Moneda" }
                 div { class: "category-grid two",
@@ -113,7 +114,7 @@ pub fn AddIncome(props: AddIncomeProps) -> Element {
                     value: income_date,
                     oninput: move |event| { state.write().income_date = event.value(); },
                 }
-                p { class: "muted", "Se usa la tasa de esa fecha o la última conocida anterior." }
+                p { class: "date-hint", "Formato venezolano: dd/mm/aaaa. Se usa la tasa de esa fecha o la última conocida anterior." }
 
                 label { class: "field-label", "Tasa del dólar para este ingreso" }
                 input {
@@ -159,7 +160,12 @@ pub fn AddIncome(props: AddIncomeProps) -> Element {
                 }
 
                 button { class: "primary wide", onclick: move |_| state.write().add_income(),
-                    "Guardar ingreso"
+                    if editing { "Guardar cambios" } else { "Guardar ingreso" }
+                }
+                if editing {
+                    button { class: "link", onclick: move |_| state.write().cancel_edit(),
+                        "Cancelar edición"
+                    }
                 }
             }
         }

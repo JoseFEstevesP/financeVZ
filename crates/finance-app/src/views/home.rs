@@ -1,8 +1,11 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{charts::Donut, icon::{icon_for_category, Icon}},
-    state::{money_usd, money_ves, payment_status_text, AppState, View},
+    components::{
+        charts::Donut,
+        icon::{Icon, icon_for_category},
+    },
+    state::{AppState, View, format_date, money_usd, money_ves, payment_status_text},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -12,12 +15,13 @@ pub struct HomeProps {
 }
 
 struct RecentRow {
+    id: finance_core::ExpenseId,
     icon: &'static str,
     category: String,
     date: String,
     amount: String,
     secondary: Option<String>,
-    evidence: bool,
+    evidence: Option<String>,
 }
 
 #[component]
@@ -41,17 +45,20 @@ pub fn Home(props: HomeProps) -> Element {
                 .or_else(|| state.rate_value_for(expense.local_date))
                 .unwrap_or(rate);
             RecentRow {
+                id: expense.id,
                 icon: icon_for_category(
-                    category.map(|category| category.name.as_str()).unwrap_or("Otros"),
+                    category
+                        .map(|category| category.name.as_str())
+                        .unwrap_or("Otros"),
                     category.and_then(|category| category.icon.as_deref()),
                 ),
                 category: category
                     .map(|category| category.name.clone())
                     .unwrap_or_else(|| "Otros".into()),
-                date: expense.local_date.to_string(),
+                date: format_date(expense.local_date),
                 amount: money_usd(cents),
                 secondary: money_ves(cents, expense_rate),
-                evidence: expense.evidence_path.is_some(),
+                evidence: expense.evidence_path.clone(),
             }
         })
         .collect();
@@ -59,8 +66,16 @@ pub fn Home(props: HomeProps) -> Element {
         .as_ref()
         .map(|report| report.by_category.clone())
         .unwrap_or_default();
-    let chart_total = report.as_ref().map(|report| report.total.cents()).unwrap_or(0);
-    let balance_class = if balance >= 0 { "balance-positive" } else { "balance-negative" };
+    let chart_total = report
+        .as_ref()
+        .map(|report| report.total.cents())
+        .unwrap_or(0);
+    let balance_class = if balance >= 0 {
+        "balance-positive"
+    } else {
+        "balance-negative"
+    };
+    let rate_label = state.latest_rate_label();
     drop(state);
 
     rsx! {
@@ -120,6 +135,26 @@ pub fn Home(props: HomeProps) -> Element {
             }
 
             div { class: "card",
+                h3 { "Tasa de cambio" }
+                p { class: "muted", "{rate_label}" }
+                p { class: "muted",
+                    "Los importes se guardan en USD. Los bolívares son solo una referencia visual calculada con la tasa vigente en la fecha de cada movimiento."
+                }
+            }
+
+            div { class: "card",
+                h3 { "Más opciones" }
+                div { class: "row-buttons",
+                    button {
+                        class: "chip",
+                        onclick: move |_| app_state.write().set_view(View::Search),
+                        Icon { name: "search", class: "chip-icon" }
+                        span { "Buscar movimientos" }
+                    }
+                }
+            }
+
+            div { class: "card",
                 h3 { "Distribución total" }
                 if segments.is_empty() {
                     p { class: "muted", "Aún no hay gastos registrados." }
@@ -151,8 +186,13 @@ pub fn Home(props: HomeProps) -> Element {
                                 strong { "{expense.category}" }
                                 small { class: "muted",
                                     "{expense.date}"
-                                    if expense.evidence {
-                                        Icon { name: "paperclip", class: "inline-icon" }
+                                    if let Some(path) = expense.evidence {
+                                        button {
+                                            class: "icon-button",
+                                            aria_label: "Ver evidencia",
+                                            onclick: move |_| app_state.write().show_evidence(&path),
+                                            Icon { name: "paperclip", class: "inline-icon" }
+                                        }
                                     }
                                 }
                                 if let Some(secondary) = expense.secondary {
@@ -160,6 +200,18 @@ pub fn Home(props: HomeProps) -> Element {
                                 }
                             }
                             span { class: "expense-amount", "{expense.amount}" }
+                            button {
+                                class: "icon-button",
+                                aria_label: "Editar gasto",
+                                onclick: move |_| app_state.write().begin_edit_expense(expense.id),
+                                Icon { name: "edit", class: "icon" }
+                            }
+                            button {
+                                class: "icon-button",
+                                aria_label: "Eliminar gasto",
+                                onclick: move |_| app_state.write().remove_expense(expense.id),
+                                Icon { name: "close", class: "icon" }
+                            }
                         }
                     }
                 }

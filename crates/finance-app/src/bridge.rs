@@ -11,6 +11,14 @@ enum BridgeMessage {
     Evidence { name: String, data: String },
     #[serde(rename = "toast_clear")]
     ToastClear,
+    #[serde(rename = "backup_import")]
+    BackupImport { data: String },
+    #[serde(rename = "biometric_result")]
+    BiometricResult {
+        action: String,
+        ok: bool,
+        message: String,
+    },
 }
 
 pub fn use_bridge(mut state: Signal<AppState>) {
@@ -20,6 +28,12 @@ pub fn use_bridge(mut state: Signal<AppState>) {
             while let Ok(message) = channel.recv::<BridgeMessage>().await {
                 match message {
                     BridgeMessage::ToastClear => state.write().clear_toast(),
+                    BridgeMessage::BackupImport { data } => state.write().import_backup_text(&data),
+                    BridgeMessage::BiometricResult {
+                        action,
+                        ok,
+                        message,
+                    } => state.write().finish_biometric(&action, ok, &message),
                     BridgeMessage::Evidence { name, data } => {
                         if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(data) {
                             state.write().attach_evidence(name, &bytes);
@@ -33,6 +47,27 @@ pub fn use_bridge(mut state: Signal<AppState>) {
 
 pub fn request_toast_clear() {
     dioxus::document::eval("if (window.__fvzClearToast) window.__fvzClearToast();");
+}
+
+pub fn request_backup_download(json: &str) {
+    let payload = serde_json::to_string(json).unwrap_or_else(|_| "\"\"".to_owned());
+    let script = format!("if (window.__fvzDownloadBackup) window.__fvzDownloadBackup({payload});");
+    dioxus::document::eval(&script);
+}
+
+pub fn request_biometric(action: &str) {
+    let action = serde_json::to_string(action).unwrap_or_else(|_| "\"unlock\"".to_owned());
+    let script = format!(
+        "if (window.FinanzasVZBiometric) window.FinanzasVZBiometric.authenticate({action}); \
+         else if (window.__fvzBridge) window.__fvzBridge.send({{kind:'biometric_result',action:{action},ok:false,message:'La huella no está disponible en este dispositivo.'}});"
+    );
+    dioxus::document::eval(&script);
+}
+
+pub fn request_light_theme(light: bool) {
+    dioxus::document::eval(&format!(
+        "if (window.FinanzasVZBiometric) window.FinanzasVZBiometric.setLightTheme({light});"
+    ));
 }
 
 // The channel above stays open for the lifetime of the app; these are one-shot commands.
@@ -52,14 +87,34 @@ if (!window.__fvzBridgeReady) {
     window.__fvzBridge.send({ kind: 'evidence', name: file.name, data: btoa(binary) });
   }, true);
 
+  document.addEventListener('change', async function (event) {
+    const input = event.target;
+    if (!input || input.id !== 'backup-file' || !input.files || !input.files[0]) return;
+    const text = await input.files[0].text();
+    window.__fvzBridge.send({ kind: 'backup_import', data: text });
+    input.value = '';
+  }, true);
+
   // Dioxus 0.7 replaces the file dialog with a desktop-only IPC dialog that is a
   // no-op on Android. Stop its listener and let the WebView open the real picker.
   window.addEventListener('click', function (event) {
     const target = event.target;
-    if (target && target.id === 'evidence-file') {
+    if (target && (target.id === 'evidence-file' || target.id === 'backup-file')) {
       event.stopImmediatePropagation();
     }
   }, true);
+
+  window.__fvzDownloadBackup = function (text) {
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'financevz-backup.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  };
 
   window.__fvzClearToast = function () {
     setTimeout(function () {

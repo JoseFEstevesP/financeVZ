@@ -4,7 +4,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use chrono::Local;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 const DOLARAPI_URL: &str = "https://ve.dolarapi.com/v1/dolares/oficial";
 
@@ -36,16 +38,52 @@ struct UpdateInfo {
     version_name: String,
     #[serde(default = "default_apk_name", alias = "url")]
     apk: String,
+    #[serde(default)]
+    sha256: Option<String>,
 }
 
 fn default_apk_name() -> String {
     "financevz.apk".to_owned()
 }
 
+pub fn checksum_of(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn expected_checksum(expected: Option<&str>) -> Result<&str, String> {
+    let value = expected
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            "El servidor no envió el sha256 del APK; por seguridad no se descarga nada.".to_owned()
+        })?;
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(
+            "El sha256 del servidor no es válido (se esperan 64 caracteres hexadecimales)."
+                .to_owned(),
+        );
+    }
+    Ok(value)
+}
+
+fn checksum_matches(actual: &str, expected: Option<&str>) -> Result<(), String> {
+    let expected = expected_checksum(expected)?;
+    if actual.eq_ignore_ascii_case(expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "El APK no coincide con la firma del servidor (sha256 {actual}). No se ha instalado nada."
+        ))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateProgress {
     Checking,
-    Downloading { downloaded: usize, total: Option<usize> },
+    Downloading {
+        downloaded: usize,
+        total: Option<usize>,
+    },
     Installing,
 }
 
@@ -56,8 +94,12 @@ pub fn local_version() -> (i64, String) {
 }
 
 #[cfg(target_os = "android")]
-fn jstring<'a>(env: &mut jni::JNIEnv<'a>, value: &str) -> Result<jni::objects::JString<'a>, String> {
-    env.new_string(value).map_err(|error| format!("cadena JNI: {error}"))
+fn jstring<'a>(
+    env: &mut jni::JNIEnv<'a>,
+    value: &str,
+) -> Result<jni::objects::JString<'a>, String> {
+    env.new_string(value)
+        .map_err(|error| format!("cadena JNI: {error}"))
 }
 
 #[cfg(target_os = "android")]
@@ -136,9 +178,11 @@ fn android_open_install_settings(
 
     let action = jstring(env, "android.settings.MANAGE_UNKNOWN_APP_SOURCES")?;
     let intent = env
-        .new_object("android/content/Intent", "(Ljava/lang/String;)V", &[
-            JValue::Object(&action),
-        ])
+        .new_object(
+            "android/content/Intent",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )
         .map_err(|error| format!("intent de ajustes: {error}"))?;
     let data = jstring(env, &format!("package:{package}"))?;
     let uri = env
@@ -158,13 +202,19 @@ fn android_open_install_settings(
         &[JValue::Object(&uri)],
     )
     .map_err(|error| format!("setData: {error}"))?;
-    env.call_method(&intent, "addFlags", "(I)Landroid/content/Intent;", &[
-        JValue::Int(0x10000000),
-    ])
+    env.call_method(
+        &intent,
+        "addFlags",
+        "(I)Landroid/content/Intent;",
+        &[JValue::Int(0x10000000)],
+    )
     .map_err(|error| format!("addFlags: {error}"))?;
-    env.call_method(&context, "startActivity", "(Landroid/content/Intent;)V", &[
-        JValue::Object(&intent),
-    ])
+    env.call_method(
+        &context,
+        "startActivity",
+        "(Landroid/content/Intent;)V",
+        &[JValue::Object(&intent)],
+    )
     .map_err(|error| format!("abrir ajustes: {error}"))?;
     Ok(())
 }
@@ -213,9 +263,11 @@ fn android_install_apk(path: &Path) -> Result<(), String> {
     let authority = jstring(&mut env, &format!("{package}.fileprovider"))?;
     let path_str = jstring(&mut env, &path.to_string_lossy())?;
     let file = env
-        .new_object("java/io/File", "(Ljava/lang/String;)V", &[
-            JValue::Object(&path_str),
-        ])
+        .new_object(
+            "java/io/File",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&path_str)],
+        )
         .map_err(|error| format!("archivo APK: {error}"))?;
     let uri = env
         .call_static_method(
@@ -234,9 +286,11 @@ fn android_install_apk(path: &Path) -> Result<(), String> {
 
     let action = jstring(&mut env, "android.intent.action.VIEW")?;
     let intent = env
-        .new_object("android/content/Intent", "(Ljava/lang/String;)V", &[
-            JValue::Object(&action),
-        ])
+        .new_object(
+            "android/content/Intent",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )
         .map_err(|error| format!("intent de instalación: {error}"))?;
     let mime = jstring(&mut env, "application/vnd.android.package-archive")?;
     env.call_method(
@@ -247,13 +301,19 @@ fn android_install_apk(path: &Path) -> Result<(), String> {
     )
     .map_err(|error| format!("setDataAndType: {error}"))?;
     let flags: jni::sys::jint = 0x00000001 | 0x10000000;
-    env.call_method(&intent, "addFlags", "(I)Landroid/content/Intent;", &[
-        JValue::Int(flags),
-    ])
+    env.call_method(
+        &intent,
+        "addFlags",
+        "(I)Landroid/content/Intent;",
+        &[JValue::Int(flags)],
+    )
     .map_err(|error| format!("addFlags: {error}"))?;
-    env.call_method(&context, "startActivity", "(Landroid/content/Intent;)V", &[
-        JValue::Object(&intent),
-    ])
+    env.call_method(
+        &context,
+        "startActivity",
+        "(Landroid/content/Intent;)V",
+        &[JValue::Object(&intent)],
+    )
     .map_err(|error| format!("iniciar instalación: {error}"))?;
 
     Ok(())
@@ -272,7 +332,9 @@ pub fn downloaded_apk_path() -> Option<PathBuf> {
 
 /// Borra el APK cacheado cuando su versión ya está instalada, además de descartes de descarga.
 pub fn cleanup_update_files() {
-    let Ok(dir) = app_files_dir() else { return; };
+    let Ok(dir) = app_files_dir() else {
+        return;
+    };
     let dir = dir.join("updates");
     let version_file = dir.join("version-code.txt");
     let cached_version = std::fs::read_to_string(&version_file)
@@ -321,27 +383,23 @@ fn fetch_update_info(base: &str) -> Result<UpdateInfo, String> {
 }
 
 /// Descarga el APK desde el servidor local. La instalación se hace después desde la UI.
-pub fn download_update(base_url: &str, progress: &(dyn Fn(UpdateProgress) + Send + Sync)) -> Result<String, String> {
+pub fn download_update(
+    base_url: &str,
+    progress: &(dyn Fn(UpdateProgress) + Send + Sync),
+) -> Result<String, String> {
     let base = base_url.trim().trim_end_matches('/');
     if !(base.starts_with("http://") || base.starts_with("https://")) {
         return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
     }
 
     progress(UpdateProgress::Checking);
-    let (info, without_manifest) = match fetch_update_info(base) {
-        Ok(info) => (info, false),
-        Err(_) => (
-            UpdateInfo {
-                version_code: i64::MAX,
-                version_name: String::new(),
-                apk: default_apk_name(),
-            },
-            true,
-        ),
-    };
+    let info = fetch_update_info(base)?;
+    expected_checksum(info.sha256.as_deref())?;
     let (local_code, local_name) = local_version();
-    if !without_manifest && info.version_code <= local_code {
-        return Ok(format!("Ya tienes la última versión instalada ({local_name})."));
+    if info.version_code <= local_code {
+        return Ok(format!(
+            "Ya tienes la última versión instalada ({local_name})."
+        ));
     }
 
     let filename = Path::new(&info.apk)
@@ -368,8 +426,8 @@ pub fn download_update(base_url: &str, progress: &(dyn Fn(UpdateProgress) + Send
     std::fs::create_dir_all(&dir).map_err(|error| format!("crear carpeta updates: {error}"))?;
     let path = dir.join("financevz.apk");
     let tmp_path = dir.join("financevz.apk.part");
-    let mut file = std::fs::File::create(&tmp_path)
-        .map_err(|error| format!("crear APK temporal: {error}"))?;
+    let mut file =
+        std::fs::File::create(&tmp_path).map_err(|error| format!("crear APK temporal: {error}"))?;
 
     let mut reader = response
         .body_mut()
@@ -377,6 +435,7 @@ pub fn download_update(base_url: &str, progress: &(dyn Fn(UpdateProgress) + Send
         .limit(200 * 1024 * 1024)
         .reader();
     let mut downloaded = 0usize;
+    let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
     loop {
         let read = reader
@@ -387,15 +446,22 @@ pub fn download_update(base_url: &str, progress: &(dyn Fn(UpdateProgress) + Send
         }
         file.write_all(&buffer[..read])
             .map_err(|error| format!("guardar APK: {error}"))?;
+        hasher.update(&buffer[..read]);
         downloaded += read;
         progress(UpdateProgress::Downloading { downloaded, total });
     }
     if downloaded < 1_000_000 {
+        let _ = std::fs::remove_file(&tmp_path);
         return Err("La descarga es demasiado pequeña para ser un APK.".into());
     }
+    if let Err(error) =
+        checksum_matches(&format!("{:x}", hasher.finalize()), info.sha256.as_deref())
+    {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(error);
+    }
     drop(file);
-    std::fs::rename(&tmp_path, &path)
-        .map_err(|error| format!("finalizar APK: {error}"))?;
+    std::fs::rename(&tmp_path, &path).map_err(|error| format!("finalizar APK: {error}"))?;
     let _ = std::fs::write(dir.join("version-code.txt"), info.version_code.to_string());
 
     log::info!("APK descargado en {path:?} ({downloaded} bytes)");
@@ -412,7 +478,10 @@ pub fn download_update(base_url: &str, progress: &(dyn Fn(UpdateProgress) + Send
 
 /// Descarga e instala. La UI usa `download_update` + `install_downloaded_apk` por separado
 /// para que `startActivity` se ejecute siempre en el hilo principal de Android.
-pub fn install_update(base_url: &str, progress: &(dyn Fn(UpdateProgress) + Send + Sync)) -> Result<String, String> {
+pub fn install_update(
+    base_url: &str,
+    progress: &(dyn Fn(UpdateProgress) + Send + Sync),
+) -> Result<String, String> {
     let message = download_update(base_url, progress)?;
     #[cfg(target_os = "android")]
     {
@@ -464,6 +533,32 @@ pub fn database_path() -> Result<PathBuf, String> {
     Ok(app_files_dir()?.join("financevz.db"))
 }
 
+/// Guarda el JSON de la copia en la carpeta privada y conserva solo las últimas `keep`.
+pub fn write_auto_backup(json: &str, keep: usize) -> Option<String> {
+    let dir = app_files_dir().ok()?.join("backups");
+    std::fs::create_dir_all(&dir).ok()?;
+    let filename = format!("financevz-{}.json", Local::now().format("%Y%m%d-%H%M%S"));
+    let path = dir.join(filename);
+    std::fs::write(&path, json).ok()?;
+
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|candidate| {
+            candidate
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with("financevz-") && name.ends_with(".json"))
+                .unwrap_or(false)
+        })
+        .collect();
+    files.sort_by(|left, right| right.cmp(left));
+    for stale in files.into_iter().skip(keep) {
+        let _ = std::fs::remove_file(stale);
+    }
+    Some(path.to_string_lossy().into_owned())
+}
+
 pub fn save_evidence(bytes: &[u8], name: &str) -> Result<(String, String), String> {
     let dir = app_files_dir()?.join("evidence");
     std::fs::create_dir_all(&dir).map_err(|error| format!("crear carpeta evidence: {error}"))?;
@@ -491,6 +586,30 @@ pub fn save_evidence(bytes: &[u8], name: &str) -> Result<(String, String), Strin
     std::fs::write(&path, bytes).map_err(|error| format!("guardar evidencia: {error}"))?;
 
     Ok((path.to_string_lossy().into_owned(), name.to_owned()))
+}
+
+/// Devuelve la evidencia como data URL para mostrarla dentro de la WebView.
+pub fn read_evidence_data_url(path: &str) -> Option<String> {
+    let root = app_files_dir().ok()?.join("evidence");
+    let candidate = Path::new(path);
+    let name = candidate.file_name()?;
+    let bytes = std::fs::read(root.join(name)).ok()?;
+    let mime = match name
+        .to_string_lossy()
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        _ => "image/jpeg",
+    };
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Some(format!("data:{mime};base64,{encoded}"))
 }
 
 #[cfg(target_os = "android")]
@@ -530,5 +649,39 @@ mod tests {
         assert_eq!(legacy.version_code, 4);
         assert_eq!(legacy.version_name, "0.1.4");
         assert_eq!(legacy.apk, "financevz.apk");
+    }
+
+    #[test]
+    fn verifies_apk_checksum_before_installing() {
+        let hash = checksum_of(b"apk de prueba");
+        assert!(checksum_matches(&hash, Some(&hash)).is_ok());
+        assert!(checksum_matches(&hash, None).is_err());
+        assert!(checksum_matches(&hash, Some("000000")).is_err());
+        assert!(checksum_matches(&hash, Some(&"0".repeat(64))).is_err());
+        let manifest_hash = "ab".repeat(32);
+        let with_checksum: UpdateInfo = serde_json::from_str(&format!(
+            r#"{{"version_code":6,"version_name":"0.1.6","apk":"financevz.apk","sha256":"{manifest_hash}"}}"#
+        ))
+        .unwrap();
+        assert_eq!(
+            with_checksum.sha256.as_deref(),
+            Some(manifest_hash.as_str())
+        );
+        assert!(expected_checksum(with_checksum.sha256.as_deref()).is_ok());
+    }
+
+    #[test]
+    fn rejects_manifest_without_checksum() {
+        let current: UpdateInfo = serde_json::from_str(
+            r#"{"version_code":6,"version_name":"0.1.6","apk":"financevz.apk"}"#,
+        )
+        .unwrap();
+        assert!(expected_checksum(current.sha256.as_deref()).is_err());
+
+        let legacy: UpdateInfo = serde_json::from_str(
+            r#"{"versionCode":6,"versionName":"0.1.6","url":"financevz.apk","sha256":""}"#,
+        )
+        .unwrap();
+        assert!(expected_checksum(legacy.sha256.as_deref()).is_err());
     }
 }

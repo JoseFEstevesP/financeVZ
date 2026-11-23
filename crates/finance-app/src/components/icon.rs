@@ -18,7 +18,9 @@ fn bodies() -> &'static HashMap<&'static str, &'static str> {
             rest = &rest[quote..];
             let Some(tag_end) = rest.find('>') else { break };
             rest = &rest[tag_end + 1..];
-            let Some(close) = rest.find("</symbol>") else { break };
+            let Some(close) = rest.find("</symbol>") else {
+                break;
+            };
             icons.insert(id, &rest[..close]);
             rest = &rest[close + "</symbol>".len()..];
         }
@@ -98,7 +100,15 @@ mod tests {
     #[test]
     fn sprite_contiene_los_iconos_de_la_app() {
         let icons = bodies();
-        for name in ["home", "reports", "categories", "payments", "update", "camera", "cashea"] {
+        for name in [
+            "home",
+            "reports",
+            "categories",
+            "payments",
+            "update",
+            "camera",
+            "cashea",
+        ] {
             assert!(icons.contains_key(name), "falta el icono {name}");
             assert!(
                 icons[name].contains("<path") || icons[name].contains("<rect"),

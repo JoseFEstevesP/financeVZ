@@ -67,7 +67,7 @@ pub struct BarsProps {
 
 struct Bar {
     label: String,
-    height: i64,
+    height: String,
     title: String,
 }
 
@@ -86,7 +86,10 @@ pub fn Bars(props: BarsProps) -> Element {
         .iter()
         .map(|month| Bar {
             label: format!("{:02}", month.month),
-            height: (month.total.cents() as f64 / max as f64 * 130.0).max(2.0) as i64,
+            height: format!(
+                "{:.3}",
+                (month.total.cents() as f64 / max as f64 * 8.125).max(0.125)
+            ),
             title: format!("{}-{:02}", month.year, month.month),
         })
         .collect();
@@ -95,7 +98,7 @@ pub fn Bars(props: BarsProps) -> Element {
         div { class: "bars",
             for bar in bars {
                 div { class: "bar-column",
-                    div { class: "bar", style: "height: {bar.height}px;", title: bar.title }
+                    div { class: "bar", style: "height: {bar.height}rem;", title: bar.title }
                     span { class: "bar-label", "{bar.label}" }
                 }
             }

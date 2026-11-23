@@ -25,10 +25,9 @@ finance-store.workspace = true
 chrono.workspace = true
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
-ureq = { version = "3", features = ["json"] }
-
-[dev-dependencies]
 serde_json = "1"
+sha2 = "0.10"
+ureq = { version = "3", features = ["json"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-context = "0.1"

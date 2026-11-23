@@ -1,9 +1,14 @@
 use dioxus::prelude::*;
-use finance_core::{format_cents_input, CategoryId, PaymentMethod, PaymentStatus, RecurringPaymentId};
+use finance_core::{
+    CategoryId, PaymentMethod, PaymentStatus, RecurringKind, RecurringPaymentId, format_cents_input,
+};
 
 use crate::{
-    components::icon::{icon_for_category, Icon},
-    state::{money_usd, money_ves, payment_status_text, AppState, EntryCurrency, PaymentKind},
+    components::icon::{Icon, icon_for_category},
+    state::{
+        AppState, EntryCurrency, PaymentKind, format_date, money_usd, money_ves,
+        payment_status_text,
+    },
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -64,6 +69,7 @@ struct PaymentRow {
     amount: String,
     secondary: Option<String>,
     status: String,
+    kind: RecurringKind,
     detail: String,
     done: bool,
     urgent: bool,
@@ -80,14 +86,14 @@ pub fn Payments(props: PaymentsProps) -> Element {
         .map(|payment| {
             let status = payment.status(chrono::Local::now().date_naive());
             let schedule = match payment.due_date {
-                Some(date) => format!("fecha {date}"),
+                Some(date) => format!("fecha {}", format_date(date)),
                 None => format!("día {}", payment.due_day),
             };
             let mut detail = vec![payment.method.label().to_owned(), schedule];
-            if let Some(note) = payment.note.as_deref() {
-                if !note.trim().is_empty() {
-                    detail.push(note.trim().to_owned());
-                }
+            if let Some(note) = payment.note.as_deref()
+                && !note.trim().is_empty()
+            {
+                detail.push(note.trim().to_owned());
             }
             PaymentRow {
                 id: payment.id,
@@ -95,9 +101,13 @@ pub fn Payments(props: PaymentsProps) -> Element {
                 amount: money_usd(payment.amount.cents()),
                 secondary: money_ves(payment.amount.cents(), rate),
                 status: payment_status_text(status),
+                kind: payment.kind,
                 detail: detail.join(" · "),
                 done: status == PaymentStatus::Paid,
-                urgent: matches!(status, PaymentStatus::Overdue(_) | PaymentStatus::DueSoon(_)),
+                urgent: matches!(
+                    status,
+                    PaymentStatus::Overdue(_) | PaymentStatus::DueSoon(_)
+                ),
             }
         })
         .collect();
@@ -129,6 +139,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
         })
         .collect();
     let feedback = snapshot.feedback.clone();
+    let recurring_kind = snapshot.recurring_kind;
     drop(snapshot);
     let methods = [
         PaymentMethod::Cashea,
@@ -151,6 +162,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                         div { class: "payment-row",
                             div { class: "grow",
                                 strong { "{row.name}" }
+                                small { class: "muted", "{row.kind.label()}" }
                                 small { class: if row.urgent { "muted urgent" } else { "muted" }, "{row.status}" }
                                 small { class: "muted", "{row.detail}" }
                                 if let Some(secondary) = row.secondary {
@@ -197,6 +209,23 @@ pub fn Payments(props: PaymentsProps) -> Element {
                         class: if entry_currency == EntryCurrency::Ves { "chip active" } else { "chip" },
                         onclick: move |_| state.write().set_entry_currency(EntryCurrency::Ves),
                         "Bs"
+                    }
+                }
+                if payment_method != PaymentMethod::Cashea {
+                    label { class: "field-label", "Tipo de registro" }
+                    div { class: "category-grid two",
+                        button {
+                            class: if recurring_kind == RecurringKind::Payment { "chip active" } else { "chip" },
+                            onclick: move |_| state.write().recurring_kind = RecurringKind::Payment,
+                            Icon { name: "payments", class: "chip-icon" }
+                            span { "Pago" }
+                        }
+                        button {
+                            class: if recurring_kind == RecurringKind::Expense { "chip active" } else { "chip" },
+                            onclick: move |_| state.write().recurring_kind = RecurringKind::Expense,
+                            Icon { name: "expense", class: "chip-icon" }
+                            span { "Gasto recurrente" }
+                        }
                     }
                 }
                 label { class: "field-label", "Método de pago" }
@@ -309,6 +338,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                         value: payment_date,
                         oninput: move |event| { state.write().payment_date = event.value(); },
                     }
+                    p { class: "date-hint", "Formato venezolano: dd/mm/aaaa." }
                 }
 
                 label { class: "field-label", "Categoría" }
