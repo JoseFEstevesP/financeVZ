@@ -44,8 +44,39 @@ impl PaymentMethod {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RecurringKind {
+    #[default]
+    Payment,
+    Expense,
+}
+
+impl RecurringKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Payment => "payment",
+            Self::Expense => "expense",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Payment => "Pago",
+            Self::Expense => "Gasto recurrente",
+        }
+    }
+
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "expense" => Self::Expense,
+            _ => Self::Payment,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewRecurringPayment {
+    pub kind: RecurringKind,
     pub name: String,
     pub amount: Money,
     pub category_id: CategoryId,
@@ -68,7 +99,11 @@ impl NewRecurringPayment {
         if self.amount.cents() <= 0 {
             return Err(DomainError::InvalidAmount);
         }
-        if self.note.as_ref().is_some_and(|note| note.chars().count() > 200) {
+        if self
+            .note
+            .as_ref()
+            .is_some_and(|note| note.chars().count() > 200)
+        {
             return Err(DomainError::NoteTooLong);
         }
         Ok(())
@@ -78,6 +113,7 @@ impl NewRecurringPayment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecurringPayment {
     pub id: RecurringPaymentId,
+    pub kind: RecurringKind,
     pub name: String,
     pub amount: Money,
     pub category_id: CategoryId,
@@ -119,7 +155,9 @@ impl RecurringPayment {
         if !self.is_one_time() && self.last_paid_period == Some((today.year(), today.month())) {
             return PaymentStatus::Paid;
         }
-        Self::status_from_days((self.due_date(today.year(), today.month()) - today).num_days() as i32)
+        Self::status_from_days(
+            (self.due_date(today.year(), today.month()) - today).num_days() as i32,
+        )
     }
 
     fn status_from_days(days: i32) -> PaymentStatus {
@@ -139,6 +177,7 @@ mod tests {
     fn payment(due_day: u8) -> RecurringPayment {
         RecurringPayment {
             id: RecurringPaymentId::new(1),
+            kind: RecurringKind::Payment,
             name: "Luz".into(),
             amount: Money::new(1500, Currency::new("VES").unwrap()).unwrap(),
             category_id: CategoryId::new(1),
@@ -154,6 +193,7 @@ mod tests {
     #[test]
     fn validates_payment_fields() {
         let mut new = NewRecurringPayment {
+            kind: RecurringKind::Payment,
             name: "Agua".into(),
             amount: Money::new(1000, Currency::new("VES").unwrap()).unwrap(),
             category_id: CategoryId::new(1),
@@ -173,8 +213,14 @@ mod tests {
     #[test]
     fn clamps_due_day_to_short_months() {
         let payment = payment(31);
-        assert_eq!(payment.due_date(2026, 2), NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
-        assert_eq!(payment.due_date(2024, 2), NaiveDate::from_ymd_opt(2024, 2, 29).unwrap());
+        assert_eq!(
+            payment.due_date(2026, 2),
+            NaiveDate::from_ymd_opt(2026, 2, 28).unwrap()
+        );
+        assert_eq!(
+            payment.due_date(2024, 2),
+            NaiveDate::from_ymd_opt(2024, 2, 29).unwrap()
+        );
     }
 
     #[test]
@@ -200,7 +246,10 @@ mod tests {
         let today = NaiveDate::from_ymd_opt(2026, 11, 20).unwrap();
         assert!(one.is_one_time());
         assert_eq!(one.status(today), PaymentStatus::Pending(5));
-        assert_eq!(one.due_date(2026, 12), NaiveDate::from_ymd_opt(2026, 11, 25).unwrap());
+        assert_eq!(
+            one.due_date(2026, 12),
+            NaiveDate::from_ymd_opt(2026, 11, 25).unwrap()
+        );
 
         one.last_paid_period = Some((2026, 11));
         assert_eq!(

@@ -6,7 +6,7 @@ const VES_PREFIX: &str = "Bs.S ";
 fn group_digits(digits: &str, separator: char) -> String {
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);
     for (index, digit) in digits.bytes().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             out.push(separator);
         }
         out.push(digit as char);
@@ -64,8 +64,17 @@ pub fn format_cents_input(digits: &str, currency_code: &str) -> String {
     let int_part = &padded[..split];
     let dec_part = &padded[split..];
     let whole: u64 = int_part.parse().unwrap_or(0);
-    let (thousands, decimal) = if currency_code == "VES" { ('.', ',') } else { (',', '.') };
-    format!("{}{}{}", group_digits(&whole.to_string(), thousands), decimal, dec_part)
+    let (thousands, decimal) = if currency_code == "VES" {
+        ('.', ',')
+    } else {
+        (',', '.')
+    };
+    format!(
+        "{}{}{}",
+        group_digits(&whole.to_string(), thousands),
+        decimal,
+        dec_part
+    )
 }
 
 #[cfg(test)]
@@ -74,9 +83,18 @@ mod tests {
 
     #[test]
     fn formats_each_currency_with_its_own_convention() {
-        assert_eq!(format_money(123456, &Currency::new("USD").unwrap()), "USD 1,234.56");
-        assert_eq!(format_money(123456, &Currency::new("VES").unwrap()), "Bs.S 1.234,56");
-        assert_eq!(format_money(-5, &Currency::new("USD").unwrap()), "-USD 0.05");
+        assert_eq!(
+            format_money(123456, &Currency::new("USD").unwrap()),
+            "USD 1,234.56"
+        );
+        assert_eq!(
+            format_money(123456, &Currency::new("VES").unwrap()),
+            "Bs.S 1.234,56"
+        );
+        assert_eq!(
+            format_money(-5, &Currency::new("USD").unwrap()),
+            "-USD 0.05"
+        );
         assert_eq!(format_money(0, &Currency::new("VES").unwrap()), "Bs.S 0,00");
     }
 

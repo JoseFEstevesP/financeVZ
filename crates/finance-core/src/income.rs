@@ -22,7 +22,11 @@ impl NewIncome {
         if self.amount.cents() <= 0 {
             return Err(DomainError::InvalidAmount);
         }
-        if self.note.as_ref().is_some_and(|note| note.chars().count() > 200) {
+        if self
+            .note
+            .as_ref()
+            .is_some_and(|note| note.chars().count() > 200)
+        {
             return Err(DomainError::NoteTooLong);
         }
         if self.local_date != self.received_at.date_naive() {
@@ -78,13 +82,19 @@ mod tests {
 
     #[test]
     fn accepts_a_valid_income() {
-        let new = income(Some("sueldo".into()), NaiveDate::from_ymd_opt(2026, 11, 21).unwrap());
+        let new = income(
+            Some("sueldo".into()),
+            NaiveDate::from_ymd_opt(2026, 11, 21).unwrap(),
+        );
         assert_eq!(new.validate(), Ok(()));
     }
 
     #[test]
     fn rejects_long_notes_and_wrong_local_date() {
-        let long = income(Some("x".repeat(201)), NaiveDate::from_ymd_opt(2026, 11, 21).unwrap());
+        let long = income(
+            Some("x".repeat(201)),
+            NaiveDate::from_ymd_opt(2026, 11, 21).unwrap(),
+        );
         assert_eq!(long.validate(), Err(DomainError::NoteTooLong));
 
         let wrong_date = income(None, NaiveDate::from_ymd_opt(2026, 11, 20).unwrap());

@@ -39,10 +39,7 @@ impl Money {
     }
 
     pub fn zero(currency: Currency) -> Self {
-        Self {
-            cents: 0,
-            currency,
-        }
+        Self { cents: 0, currency }
     }
 
     pub fn from_cents(cents: i64, currency: Currency) -> Self {
@@ -61,7 +58,10 @@ impl Money {
         if self.currency != other.currency {
             return Err(DomainError::MixedCurrencies);
         }
-        let cents = self.cents.checked_add(other.cents).ok_or(DomainError::Overflow)?;
+        let cents = self
+            .cents
+            .checked_add(other.cents)
+            .ok_or(DomainError::Overflow)?;
         Ok(Self {
             cents,
             currency: self.currency.clone(),
@@ -83,8 +83,14 @@ mod tests {
     #[test]
     fn money_rejects_non_positive_amounts() {
         let currency = Currency::new("USD").unwrap();
-        assert_eq!(Money::new(0, currency.clone()), Err(DomainError::InvalidAmount));
-        assert_eq!(Money::new(-1, currency.clone()), Err(DomainError::InvalidAmount));
+        assert_eq!(
+            Money::new(0, currency.clone()),
+            Err(DomainError::InvalidAmount)
+        );
+        assert_eq!(
+            Money::new(-1, currency.clone()),
+            Err(DomainError::InvalidAmount)
+        );
         assert!(Money::new(1, currency).is_ok());
     }
 

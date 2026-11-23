@@ -35,12 +35,21 @@ pub struct Report {
 pub fn build_report(expenses: &[Expense], categories: &[Category]) -> Result<Report, DomainError> {
     let entries: Vec<_> = expenses
         .iter()
-        .map(|expense| (expense.local_date, expense.category_id, expense.amount.clone()))
+        .map(|expense| {
+            (
+                expense.local_date,
+                expense.category_id,
+                expense.amount.clone(),
+            )
+        })
         .collect();
     aggregate(&entries, categories)
 }
 
-pub fn build_income_report(incomes: &[Income], categories: &[Category]) -> Result<Report, DomainError> {
+pub fn build_income_report(
+    incomes: &[Income],
+    categories: &[Category],
+) -> Result<Report, DomainError> {
     let entries: Vec<_> = incomes
         .iter()
         .map(|income| (income.local_date, income.category_id, income.amount.clone()))
@@ -57,9 +66,11 @@ fn aggregate(
         .map(|(_, _, amount)| amount.currency().clone())
         .unwrap_or_else(|| Currency::new("USD").expect("USD is valid"));
 
-    let total = entries.iter().try_fold(Money::zero(currency.clone()), |acc, (_, _, amount)| {
-        acc.checked_add(amount)
-    })?;
+    let total = entries
+        .iter()
+        .try_fold(Money::zero(currency.clone()), |acc, (_, _, amount)| {
+            acc.checked_add(amount)
+        })?;
 
     let mut by_category: BTreeMap<i64, i64> = BTreeMap::new();
     let mut by_month: BTreeMap<(i32, u32), i64> = BTreeMap::new();
@@ -92,7 +103,7 @@ fn aggregate(
         .collect::<Result<Vec<_>, DomainError>>()?;
 
     let mut category_totals = category_totals;
-    category_totals.sort_by(|a, b| b.total.cents().cmp(&a.total.cents()));
+    category_totals.sort_by_key(|item| std::cmp::Reverse(item.total.cents()));
 
     let month_totals = by_month
         .into_iter()
@@ -132,10 +143,8 @@ mod tests {
     }
 
     fn expense(id: i64, category_id: i64, cents: i64, day: u32) -> Expense {
-        let spent_at = DateTime::parse_from_rfc3339(&format!(
-            "2026-11-{day:02}T12:00:00-04:00"
-        ))
-        .unwrap();
+        let spent_at =
+            DateTime::parse_from_rfc3339(&format!("2026-11-{day:02}T12:00:00-04:00")).unwrap();
         Expense {
             id: ExpenseId::new(id),
             amount: Money::new(cents, Currency::new("USD").unwrap()).unwrap(),
@@ -177,10 +186,8 @@ mod tests {
             amount: Money::new(cents, Currency::new("USD").unwrap()).unwrap(),
             category_id: CategoryId::new(category_id),
             note: None,
-            received_at: DateTime::parse_from_rfc3339(&format!(
-                "2026-11-{day:02}T12:00:00-04:00"
-            ))
-            .unwrap(),
+            received_at: DateTime::parse_from_rfc3339(&format!("2026-11-{day:02}T12:00:00-04:00"))
+                .unwrap(),
             local_date: NaiveDate::from_ymd_opt(2026, 11, day).unwrap(),
             rate_cents: None,
             rate_day: None,

@@ -1,6 +1,10 @@
 use chrono::{DateTime, FixedOffset, NaiveDate};
 
-use crate::{error::DomainError, ids::{CategoryId, ExpenseId}, money::Money};
+use crate::{
+    error::DomainError,
+    ids::{CategoryId, ExpenseId},
+    money::Money,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewExpense {
@@ -19,7 +23,11 @@ impl NewExpense {
         if self.amount.cents() <= 0 {
             return Err(DomainError::InvalidAmount);
         }
-        if self.note.as_ref().is_some_and(|note| note.chars().count() > 200) {
+        if self
+            .note
+            .as_ref()
+            .is_some_and(|note| note.chars().count() > 200)
+        {
             return Err(DomainError::NoteTooLong);
         }
         if self.local_date != self.spent_at.date_naive() {
@@ -79,13 +87,19 @@ mod tests {
 
     #[test]
     fn accepts_a_valid_expense() {
-        let new = expense(Some("almuerzo".into()), NaiveDate::from_ymd_opt(2026, 11, 21).unwrap());
+        let new = expense(
+            Some("almuerzo".into()),
+            NaiveDate::from_ymd_opt(2026, 11, 21).unwrap(),
+        );
         assert_eq!(new.validate(), Ok(()));
     }
 
     #[test]
     fn rejects_long_notes_and_wrong_local_date() {
-        let long = expense(Some("x".repeat(201)), NaiveDate::from_ymd_opt(2026, 11, 21).unwrap());
+        let long = expense(
+            Some("x".repeat(201)),
+            NaiveDate::from_ymd_opt(2026, 11, 21).unwrap(),
+        );
         assert_eq!(long.validate(), Err(DomainError::NoteTooLong));
 
         let wrong_date = expense(None, NaiveDate::from_ymd_opt(2026, 11, 20).unwrap());
