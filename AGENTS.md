@@ -12,7 +12,7 @@
 - Verificación de CI: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`, `cargo test --workspace --no-default-features`. Añade `cargo check --workspace --no-default-features` si quieres un extra.
 - Un test suelto / un crate: `cargo test -p finance-app --no-default-features verifies_apk_checksum_before_installing`, `cargo test -p finance-store --no-default-features <filtro>`.
 - Usa siempre `--no-default-features` en host: `finance-app` tiene `default = ["desktop"]`, que arrastra GTK/WebKit; CI no configura target Android.
-- APK debug: `bash scripts/build-android.sh [target]`. Release firmado: `bash scripts/build-release.sh [target]` con `FINANCEVZ_KEYSTORE_PATH`, `FINANCEVZ_KEYSTORE_PASSWORD` y `FINANCEVZ_KEY_PASSWORD` (ver `scripts/setup-keystore.sh`). Pasar de debug a release obliga a desinstalar la debug.
+- Build: `bash scripts/build.sh [target]` lee `.env` (ignorado por git; plantilla en `.env.example`) y con `MODE=dev` llama a `build-android.sh` (debug) o con `MODE=prod` a `build-release.sh` (firma con `FINANCEVZ_KEYSTORE_PATH`, `FINANCEVZ_KEYSTORE_PASSWORD`, `FINANCEVZ_KEY_PASSWORD` y `FINANCEVZ_KEY_ALIAS`). Pasar de debug a release obliga a desinstalar la debug.
 - Servir actualizaciones: `python3 scripts/serve-update.sh [puerto]`; en la app se escribe solo `http://IP:PUERTO`.
 
 ## Generado y versionado

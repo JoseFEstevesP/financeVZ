@@ -43,16 +43,21 @@ El host de desarrollo usa `pnpm`; no uses `npm` ni `npx` para herramientas Node.
 
 ## Compilar y ejecutar en Android
 
+El punto de entrada es `scripts/build.sh`, que lee `.env` y elige el tipo de APK con `MODE`:
+
 ```bash
-scripts/build-android.sh                    # target por defecto: aarch64-linux-android
-scripts/build-android.sh armv7-linux-androideabi  # u otro target disponible
+cp .env.example .env                     # solo la primera vez
+scripts/build.sh                         # MODE=dev: APK debug sin firma
+scripts/build.sh armv7-linux-androideabi # u otro target disponible
 ```
 
-El script:
+Pon `MODE=prod` en `.env` para generar el APK firmado (ver [Build release firmado](#build-release-firmado)). Los scripts internos siguen siendo `scripts/build-android.sh` (debug) y `scripts/build-release.sh` (firma); normalmente no hace falta llamarlos directamente.
+
+El script seleccionado:
 
 1. Incrementa el `versionCode` leyendo `crates/finance-app/android/version-code.txt` y deriva el `versionName` como `0.1.<code>`.
 2. Copia la configuración XML de Android, el `MainActivity.kt` y el icono de marca al proyecto generado por `dx` (tras el build se inyecta también la dependencia `androidx.biometric` en el Gradle generado).
-3. Ejecuta `dx build --android -p finance-app --target <target>` y `gradlew assembleDebug`.
+3. Ejecuta `dx build --android -p finance-app --target <target>` y `gradlew assembleDebug` o `assembleRelease` según `MODE`.
 4. Copia el APK a `updates/financevz.apk`, escribe `updates/update.json` con su SHA-256 y actualiza el archivo de versión.
 
 El script **no instala** el APK: instala `updates/financevz.apk` en el dispositivo (por ejemplo, con `adb install -r updates/financevz.apk`). Al terminar imprime la URL que conviene poner en la app.
@@ -102,16 +107,17 @@ Al iniciar se eliminan el APK cacheado y su versión si ya están instalados, ad
 
 ## Build release firmado
 
-El keystore se guarda fuera del repo, en `$HOME/.config/financevz/` por defecto:
+El keystore se guarda fuera del repo, en `$HOME/.config/financevz/` por defecto, y sus credenciales se leen de `.env` (ignorado por git):
 
 ```bash
 scripts/setup-keystore.sh          # keytool pide las contraseñas de forma interactiva
-# Exporta FINANCEVZ_KEYSTORE_PATH, FINANCEVZ_KEYSTORE_PASSWORD,
-# FINANCEVZ_KEY_PASSWORD y (opcionalmente) FINANCEVZ_KEY_ALIAS
-scripts/build-release.sh           # genera updates/financevz.apk + update.json firmados
+cp .env.example .env               # si aún no existe
+# Edita .env: MODE=prod y FINANCEVZ_KEYSTORE_PATH, FINANCEVZ_KEYSTORE_PASSWORD,
+# FINANCEVZ_KEY_PASSWORD y FINANCEVZ_KEY_ALIAS
+scripts/build.sh                   # genera updates/financevz.apk + update.json firmados
 ```
 
-Las contraseñas se leen del entorno dentro de Gradle; no se escriben en archivos del proyecto ni se muestran en los logs. Haz una copia segura del keystore y de las contraseñas: sin ellos no podrás firmar futuras actualizaciones.
+Las contraseñas se exportan desde `.env` y Gradle las lee del entorno; no se escriben en archivos versionados ni se muestran en los logs. El `.env` está en `.gitignore`: no lo subas al repo. Haz una copia segura del keystore y de las contraseñas: sin ellos no podrás firmar futuras actualizaciones.
 
 ## Configuración
 
