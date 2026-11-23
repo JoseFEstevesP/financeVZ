@@ -37,6 +37,7 @@ GRADLE="$GEN/app/build.gradle.kts"
 sed -i -E "s/versionCode = [0-9]+/versionCode = $CODE/; s/versionName = \"[^\"]*\"/versionName = \"$VERSION_NAME\"/" "$GRADLE"
 grep -q "versionCode = $CODE" "$GRADLE"
 grep -q "versionName = \"$VERSION_NAME\"" "$GRADLE"
+bash scripts/patch-android-gradle.sh "$GRADLE"
 
 cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
 cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
@@ -47,7 +48,9 @@ bash scripts/install-brand-icon.sh "$GEN"
 APK="$GEN/app/build/outputs/apk/debug/app-debug.apk"
 mkdir -p "$UPDATES"
 cp "$APK" "$UPDATES/financevz.apk"
-printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk"}\n' "$CODE" "$VERSION_NAME" > "$UPDATES/update.json"
+SHA256="$(sha256sum "$UPDATES/financevz.apk" | awk '{print $1}')"
+printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk", "sha256": "%s"}\n' \
+  "$CODE" "$VERSION_NAME" "$SHA256" > "$UPDATES/update.json"
 printf '%s\n' "$CODE" > "$VERSION_FILE"
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"

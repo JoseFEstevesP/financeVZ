@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    name: Formato, clippy y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust stable con rustfmt y clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # No configuramos el target de Android: en CI solo se verifica el código para host.
+      - name: Comprobar formato
+        run: cargo fmt --all -- --check
+
+      - name: Clippy sin features por defecto
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+
+      - name: Pruebas sin features por defecto
+        run: cargo test --workspace --no-default-features
