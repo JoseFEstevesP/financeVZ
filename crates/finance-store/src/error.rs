@@ -8,4 +8,6 @@ pub enum StoreError {
     Migration(#[from] rusqlite_migration::Error),
     #[error("regla de negocio: {0}")]
     Domain(#[from] finance_core::DomainError),
+    #[error("copia de seguridad inválida: {0}")]
+    Backup(String),
 }

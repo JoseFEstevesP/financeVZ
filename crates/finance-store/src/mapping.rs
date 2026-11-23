@@ -1,9 +1,9 @@
 use chrono::{DateTime, NaiveDate};
 use finance_core::{
     Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money, PaymentMethod,
-    RecurringPayment, RecurringPaymentId,
+    RecurringKind, RecurringPayment, RecurringPaymentId,
 };
-use rusqlite::{types::Type, Error, Row};
+use rusqlite::{Error, Row, types::Type};
 
 fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> Error {
     Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
@@ -81,6 +81,7 @@ pub fn recurring_from_row(row: &Row<'_>) -> Result<RecurringPayment, Error> {
 
     Ok(RecurringPayment {
         id: RecurringPaymentId::new(row.get("id")?),
+        kind: RecurringKind::parse(&row.get::<_, String>("kind")?),
         name: row.get("name")?,
         amount: Money::from_cents(cents, currency),
         category_id: CategoryId::new(row.get("category_id")?),

@@ -10,7 +10,8 @@ mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDate};
     use finance_core::{
-        Currency, Money, NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus,
+        Backup, Currency, Money, NewExpense, NewIncome, NewRecurringPayment, PaymentMethod,
+        PaymentStatus,
     };
 
     #[test]
@@ -94,13 +95,16 @@ mod tests {
     #[test]
     fn persists_settings_and_recurring_payments() {
         let repo = SqliteRepository::open_in_memory().unwrap();
-        let category_id = repo.add_category("Hogar", Some("house"), "#ffffff").unwrap();
+        let category_id = repo
+            .add_category("Hogar", Some("house"), "#ffffff")
+            .unwrap();
 
         assert_eq!(repo.get_setting("rate").unwrap(), None);
         repo.set_setting("rate", "85789").unwrap();
         assert_eq!(repo.get_setting("rate").unwrap(), Some("85789".into()));
 
         let payment = NewRecurringPayment {
+            kind: finance_core::RecurringKind::Payment,
             name: "Luz".into(),
             amount: Money::new(1500, Currency::new("USD").unwrap()).unwrap(),
             category_id,
@@ -150,6 +154,7 @@ mod tests {
         let category_id = repo.add_category("Compras", None, "#ffffff").unwrap();
         let due = NaiveDate::from_ymd_opt(2026, 11, 25).unwrap();
         let payment = NewRecurringPayment {
+            kind: finance_core::RecurringKind::Payment,
             name: "Cashea".into(),
             amount: Money::new(8000, Currency::new("USD").unwrap()).unwrap(),
             category_id,
@@ -217,5 +222,47 @@ mod tests {
         assert_eq!(saved.evidence_path.as_deref(), Some("/tmp/recibo.jpg"));
         assert_eq!(saved.rate_cents, Some(85789));
         assert_eq!(saved.rate_day.as_deref(), Some("2026-11-21"));
+    }
+
+    #[test]
+    fn backup_roundtrip_replaces_and_restores_all_data() {
+        let repo = SqliteRepository::open_in_memory().unwrap();
+        let category_id = repo.add_category("Comida", None, "#ff0000").unwrap();
+        repo.set_budget(category_id, 10000).unwrap();
+        repo.set_rate_for_day(
+            NaiveDate::from_ymd_opt(2026, 11, 22).unwrap(),
+            85789,
+            "dolarapi",
+        )
+        .unwrap();
+        let day = NaiveDate::from_ymd_opt(2026, 11, 22).unwrap();
+        repo.insert_expense(&NewExpense {
+            amount: Money::new(1250, Currency::new("USD").unwrap()).unwrap(),
+            category_id,
+            note: None,
+            spent_at: DateTime::parse_from_rfc3339("2026-11-22T12:00:00-04:00").unwrap(),
+            local_date: day,
+            evidence_path: None,
+            rate_cents: None,
+            rate_day: None,
+        })
+        .unwrap();
+
+        let backup = repo.export_backup().unwrap();
+        backup.validate().unwrap();
+        assert_eq!(backup.expenses.len(), 1);
+        assert_eq!(backup.rates.len(), 1);
+        assert_eq!(backup.settings.len(), 0);
+
+        repo.import_backup(&Backup::new("2026-11-22T00:00:00Z".into()))
+            .unwrap();
+        assert!(repo.expenses_between(day, day).unwrap().is_empty());
+        assert!(repo.categories().unwrap().is_empty());
+
+        repo.import_backup(&backup).unwrap();
+        assert_eq!(repo.expenses_between(day, day).unwrap().len(), 1);
+        assert_eq!(repo.categories().unwrap().len(), 1);
+        assert_eq!(repo.budgets().unwrap().len(), 1);
+        assert_eq!(repo.rate_details().unwrap()[0].2, "dolarapi");
     }
 }
