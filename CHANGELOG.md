@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.29] - 2026-11-24
+
+### Cambiado
+
+- La tasa del dólar se lee directamente del dólar oficial publicado por el BCV, en lugar de DolarAPI, que dejó de actualizarse.
+
 ## [0.1.28] - 2026-11-23
 
 ### Añadido

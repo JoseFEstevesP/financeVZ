@@ -7,27 +7,41 @@ use std::{
 use chrono::Local;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use ureq::tls::TlsConfig;
 
-const DOLARAPI_URL: &str = "https://ve.dolarapi.com/v1/dolares/oficial";
+const BCV_URL: &str = "https://www.bcv.org.ve";
 
-#[derive(Deserialize)]
-struct DolarApiResponse {
-    promedio: Option<f64>,
+fn parse_bcv_rate(html: &str) -> Option<i64> {
+    let section = html.get(html.find("id=\"dolar\"")?..)?;
+    let opening = section.find("<strong")?;
+    let value_start = opening + section.get(opening..)?.find('>')? + 1;
+    let value_end = value_start + section.get(value_start..)?.find("</strong>")?;
+    let raw = section.get(value_start..value_end)?.trim();
+    let normalized = raw.replace('.', "").replace(',', ".");
+    let value: f64 = normalized.parse().ok()?;
+    if !value.is_finite() || value <= 0.0 || value >= 100_000.0 {
+        return None;
+    }
+    Some((value * 100.0).round() as i64)
 }
 
 pub fn fetch_exchange_rate() -> Option<i64> {
     let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(5)))
+        .timeout_global(Some(Duration::from_secs(15)))
+        // El BCV sirve una cadena de certificados incompleta; igual lo hace dolar_api.
+        .tls_config(TlsConfig::builder().disable_verification(true).build())
         .build()
         .new_agent();
-    let response = agent.get(DOLARAPI_URL).call().ok()?;
-    let mut response = response;
-    let body: DolarApiResponse = response.body_mut().read_json().ok()?;
-    let rate = body.promedio?;
-    if !rate.is_finite() || rate <= 0.0 {
-        return None;
-    }
-    Some((rate * 100.0).round() as i64)
+    let mut response = agent
+        .get(BCV_URL)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
+        .call()
+        .ok()?;
+    let html = response.body_mut().read_to_string().ok()?;
+    parse_bcv_rate(&html)
 }
 
 #[derive(Deserialize)]
@@ -631,6 +645,32 @@ pub fn init_logging() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_bcv_dollar_rate() {
+        let html = r#"<div id="dolar" class="col-sm-12 col-xs-12 ">
+            <strong class="strong-tb">919,82270000</strong>
+        </div>"#;
+        assert_eq!(parse_bcv_rate(html), Some(91_982));
+    }
+
+    #[test]
+    fn parses_bcv_rate_with_thousands_separator() {
+        let html = r#"id="euro"><strong>1.011,17949056</strong></div>
+        id="dolar"><strong>1.011,17949056</strong>"#;
+        assert_eq!(parse_bcv_rate(html), Some(101_118));
+    }
+
+    #[test]
+    fn rejects_missing_or_invalid_bcv_rate() {
+        assert_eq!(
+            parse_bcv_rate("id=\"euro\"><strong>919,82270000</strong>"),
+            None
+        );
+        assert_eq!(parse_bcv_rate("id=\"dolar\">sin valor"), None);
+        assert_eq!(parse_bcv_rate("id=\"dolar\"><strong>abc</strong>"), None);
+        assert_eq!(parse_bcv_rate("id=\"dolar\"><strong>0,00</strong>"), None);
+    }
 
     #[test]
     fn parses_update_json_in_both_formats() {

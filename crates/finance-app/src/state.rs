@@ -491,7 +491,7 @@ impl AppState {
                 let today = Local::now().date_naive();
                 if let Ok(repo) = self.repo.lock() {
                     let _ = repo.set_setting(RATE_SETTING, &rate.to_string());
-                    let _ = repo.set_rate_for_day(today, rate, "dolarapi");
+                    let _ = repo.set_rate_for_day(today, rate, "bcv");
                 }
                 self.feedback = Some(format!("Tasa actualizada: {}", format_rate(rate)));
             }
@@ -1487,6 +1487,7 @@ impl AppState {
         match self.rate_history.first() {
             Some((day, rate, source, _)) => {
                 let origin = match source.as_str() {
+                    "bcv" => "automática (BCV)",
                     "dolarapi" => "automática (DolarAPI)",
                     value if value.starts_with("manual") => "manual",
                     _ => source.as_str(),

@@ -15,14 +15,14 @@ App Android de finanzas personales para uso personal. La lógica de negocio est�
 - Ver reportes visuales, balances por categoría y el historial de tasas.
 - Actualizar la app desde un servidor local, verificando el SHA-256 obligatorio del APK.
 
-El dinero se almacena como centavos en `i64`, con USD como base. La conversión a bolívares se usa solo para mostrar; la tasa se obtiene de `https://ve.dolarapi.com/v1/dolares/oficial` y se guarda por día.
+El dinero se almacena como centavos en `i64`, con USD como base. La conversión a bolívares se usa solo para mostrar; la tasa se lee del dólar oficial publicado por el BCV en `https://www.bcv.org.ve` y se guarda por día.
 
 Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Política de privacidad: https://josefestevesp.github.io/finanzasvz-privacidad/
 
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.28: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.28.apk
+- APK firmado 0.1.29: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.29.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.

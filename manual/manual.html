@@ -124,7 +124,7 @@
 	<div class="purpose-box"><strong>Para qué sirve:</strong> llevar el control de gastos e ingresos en bolívares y dólares, programar pagos y cuotas, definir presupuestos por categoría y ver reportes, sin depender de la nube.</div>
 	<div class="areas-grid">
 		<div class="area-card"><h4>Dinero</h4><p>Se guarda en centavos como entero y la base es USD. Los bolívares son solo una vista usando la tasa del día.</p></div>
-		<div class="area-card"><h4>Tasa de cambio</h4><p>Se toma de DolarAPI (promedio oficial BCV) y se guarda por fecha. Si no hay tasa del día, se usa la última anterior.</p></div>
+		<div class="area-card"><h4>Tasa de cambio</h4><p>Se lee del dólar oficial publicado por el BCV en su página web y se guarda por fecha. Si no hay tasa del día, se usa la última anterior.</p></div>
 		<div class="area-card"><h4>Fechas</h4><p>En pantalla se muestran como <code>dd/mm/aaaa</code>. Internamente se guardan en formato ISO.</p></div>
 		<div class="area-card"><h4>Privacidad</h4><p>Sin anuncios ni analítica. La única conexión externa es la consulta de la tasa, sin datos personales.</p></div>
 	</div>
@@ -194,8 +194,8 @@
 	<div class="purpose-box"><strong>Para qué sirve:</strong> comparar lo que entra y sale, detectar categorías que se salen del presupuesto y seguir la evolución mes a mes.</div>
 
 	<h3><span class="num">4.2</span> Tasa del dólar</h3>
-	<p class="desc">El bloque <b>Tasa del dólar</b> muestra el valor vigente en bolívares por USD y su fecha. Si la tasa automática no es la Que quieres usar, escribe el valor en el campo y pulsa <b>Guardar tasa</b>. El botón <b>Actualizar</b> vuelve a consultar la API.</p>
-	<div class="tip-box"><strong>Nota:</strong> la corrección manual no altera la tasa histórica de DolarAPI; solo guarda el valor que decides usar. Si un día no hay tasa, la app reutiliza la última disponible.</div>
+	<p class="desc">El bloque <b>Tasa del dólar</b> muestra el valor vigente en bolívares por USD y su fecha. Si la tasa automática no es la que quieres usar, escribe el valor en el campo y pulsa <b>Guardar tasa</b>. El botón <b>Actualizar</b> vuelve a leer la tasa del sitio del BCV.</p>
+	<div class="tip-box"><strong>Nota:</strong> la corrección manual no altera la tasa histórica leída del BCV; solo guarda el valor que decides usar. Si un día no hay tasa, la app reutiliza la última disponible.</div>
 	<figure><img src="../capturas/04-reportes-historial.webp" alt="Reportes desplazados al historial"><figcaption>Reportes desplazados: detalle por categoría e historial de tasas.</figcaption></figure>
 </section>
 
@@ -308,13 +308,13 @@
 		<li><code>updates/</code>: APK descargado y archivos temporales de la descarga.</li>
 	</ul>
 	<p class="desc">Al arrancar se borran el APK cacheado ya instalado y los descartes <code>.part</code>. En escritorio se puede cambiar la ruta con <code>FINANCEVZ_DATA_DIR</code>.</p>
-	<div class="purpose-box"><strong>Privacidad:</strong> no hay cuentas ni analítica. Los gastos y copias se guardan solo en el dispositivo. La única conexión es <a href="https://ve.dolarapi.com/v1/dolares/oficial">ve.dolarapi.com/v1/dolares/oficial</a>, sin datos personales. Política completa: <a href="https://josefestevesp.github.io/finanzasvz-privacidad/">josefestevesp.github.io/finanzasvz-privacidad</a>.</div>
+	<div class="purpose-box"><strong>Privacidad:</strong> no hay cuentas ni analítica. Los gastos y copias se guardan solo en el dispositivo. La única conexión es la página del BCV, <a href="https://www.bcv.org.ve">www.bcv.org.ve</a>, sin datos personales. Política completa: <a href="https://josefestevesp.github.io/finanzasvz-privacidad/">josefestevesp.github.io/finanzasvz-privacidad</a>.</div>
 </section>
 
 <h2 class="chapter-title" id="c-10">10. Preguntas frecuentes</h2>
 <section class="module">
 	<h3>¿Por qué no aparece la tasa de hoy?</h3>
-	<p class="desc">DolarAPI publica el promedio oficial diario. Si aún no hay valor para la fecha, la app usa la última tasa anterior. Puedes corregirla en Reportes o en el propio formulario del movimiento.</p>
+	<p class="desc">El BCV publica el dólar oficial con una «Fecha Valor». Si aún no hay valor para la fecha, la app usa la última tasa anterior. Puedes corregirla en Reportes o en el propio formulario del movimiento.</p>
 	<h3>¿Por qué el importe se guarda con otro valor?</h3>
 	<p class="desc">Los campos de importe interpretan los dígitos como centavos y los formatean mientras escribes. Escribe <code>85789</code> para 857,89 USD (o el equivalente en Bs).</p>
 	<h3>¿Puedo recuperar el PIN?</h3>
