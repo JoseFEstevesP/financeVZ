@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.30] - 2026-11-24
+
+### Añadido
+
+- Botón **Inicio** en el menú inferior, para que no haga falta saber que el logo de la cabecera vuelve al inicio.
+
 ## [0.1.29] - 2026-11-24
 
 ### Cambiado

@@ -183,6 +183,7 @@ fn App() -> Element {
                 }
             }
             nav { class: "bottom-nav",
+                Tab { target: View::Home, label: "Inicio", icon: "home", active: view == View::Home, app_state }
                 Tab { target: View::Reports, label: "Reportes", icon: "reports", active: view == View::Reports, app_state }
                 Tab { target: View::Categories, label: "Categorías", icon: "categories", active: view == View::Categories, app_state }
                 Tab { target: View::Payments, label: "Pagos", icon: "payments", active: view == View::Payments, app_state }
