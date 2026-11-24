@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.28] - 2026-11-23
+
+### Añadido
+
+- APK firmado publicado en GitHub Releases y página de descarga en GitHub Pages.
+
 ## [0.1.26] - 2026-11-22
 
 ### Corregido

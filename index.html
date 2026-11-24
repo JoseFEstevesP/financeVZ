@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>financeVZ — Finanzas personales en Android</title>
+<meta name="description" content="financeVZ: controla gastos, ingresos, pagos y presupuestos en Android. Descarga el APK firmado.">
+<style>
+	:root {
+		--bg:#0b1220;
+		--panel:#121c2e;
+		--panel-2:#18243a;
+		--line:#27364f;
+		--ink:#e8eef8;
+		--muted:#9aabc4;
+		--brand:#5b8cff;
+		--accent:#2dd4a7;
+	}
+	* { box-sizing:border-box; }
+	html { scroll-behavior:smooth; }
+	body {
+		margin:0;
+		font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+		background:var(--bg);
+		color:var(--ink);
+		line-height:1.6;
+	}
+	a { color:var(--brand); text-decoration:none; }
+	a:hover { text-decoration:underline; }
+	.wrap { width:min(1080px,92%); margin:0 auto; }
+
+	header {
+		display:flex; align-items:center; justify-content:space-between;
+		padding:18px 0; border-bottom:1px solid var(--line);
+	}
+	.brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:20px; }
+	.brand svg { width:30px; height:30px; color:var(--accent); }
+	nav a { margin-left:20px; font-size:14px; }
+
+	.hero { padding:70px 0 50px; text-align:center; }
+	.hero .pill {
+		display:inline-block; padding:5px 14px; border:1px solid var(--line);
+		border-radius:999px; color:var(--muted); font-size:13px; margin-bottom:20px;
+	}
+	.hero h1 { font-size:clamp(38px,7vw,64px); margin:0 0 6px; letter-spacing:-1px; }
+	.hero h1 span { color:var(--brand); }
+	.hero .tagline { color:var(--muted); font-size:19px; max-width:650px; margin:0 auto 28px; }
+	.actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+	.btn {
+		display:inline-block; padding:13px 24px; border-radius:10px; font-weight:700;
+		font-size:15px; border:1px solid transparent;
+	}
+	.btn-primary { background:var(--brand); color:#fff; }
+	.btn-primary:hover { background:#4a7cf0; text-decoration:none; }
+	.btn-ghost { border-color:var(--line); color:var(--ink); }
+	.btn-ghost:hover { border-color:var(--brand); text-decoration:none; }
+	.hero small { display:block; color:var(--muted); margin-top:18px; }
+
+	section { padding:45px 0; border-top:1px solid var(--line); }
+	section h2 { font-size:26px; margin:0 0 22px; }
+	.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; }
+	.card {
+		background:var(--panel); border:1px solid var(--line); border-radius:12px;
+		padding:18px 20px;
+	}
+	.card h3 { margin:0 0 6px; font-size:16px; color:var(--accent); }
+	.card p { margin:0; color:var(--muted); font-size:14px; }
+
+	.shots { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+	.shots figure { margin:0; text-align:center; }
+	.shots img {
+		width:100%; border:1px solid var(--line); border-radius:10px; display:block;
+		background:var(--panel-2);
+	}
+	.shots figcaption { color:var(--muted); font-size:12px; padding-top:6px; }
+
+	.steps { counter-reset:step; list-style:none; padding:0; margin:0; }
+	.steps li {
+		position:relative; padding:12px 0 12px 46px; border-bottom:1px solid var(--line);
+		color:var(--muted);
+	}
+	.steps li::before {
+		counter-increment:step; content:counter(step);
+		position:absolute; left:0; top:10px; width:30px; height:30px; border-radius:50%;
+		background:var(--panel-2); border:1px solid var(--line); color:var(--brand);
+		display:grid; place-items:center; font-weight:700;
+	}
+
+	.note {
+		background:#122a26; border:1px solid #1f5a4c; border-radius:10px;
+		padding:16px 20px; color:#c9f4e6;
+	}
+	footer {
+		border-top:1px solid var(--line); padding:28px 0 40px;
+		color:var(--muted); font-size:14px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;
+	}
+	@media (max-width:640px) {
+		nav a { margin-left:12px; font-size:13px; }
+		.hero { padding-top:45px; }
+	}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+	<header>
+		<div class="brand">
+			<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M58 136h32a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H58a14 14 0 0 1-14-14v-52a14 14 0 0 1 14-14Zm60-40h32a14 14 0 0 1 14 14v92a14 14 0 0 1-14 14h-32a14 14 0 0 1-14-14v-92a14 14 0 0 1 14-14Zm60-20h32a14 14 0 0 1 14 14v112a14 14 0 0 1-14 14h-32a14 14 0 0 1-14-14V90a14 14 0 0 1 14-14Zm14-58 34 56h-68Z"/></svg>
+			financeVZ
+		</div>
+		<nav>
+			<a href="#caracteristicas">Características</a>
+			<a href="#capturas">Capturas</a>
+			<a href="#instalar">Instalar</a>
+			<a href="manual/manual.html">Manual</a>
+		</nav>
+	</header>
+
+	<main>
+		<div class="hero">
+			<span class="pill">v0.1.28 · código 28 · APK firmado</span>
+			<h1>Tus finanzas, <span>en tu bolsillo</span></h1>
+			<p class="tagline">Gastos, ingresos, pagos y presupuestos en bolívares y dólares. Sin cuentas, sin anuncios y sin servidor propio: tus datos se quedan en tu teléfono.</p>
+			<div class="actions">
+				<a class="btn btn-primary" href="https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.28.apk">Descargar APK</a>
+				<a class="btn btn-ghost" href="https://github.com/JoseFEstevesP/financeVZ/releases/latest">Ver release</a>
+				<a class="btn btn-ghost" href="manual/manual.pdf">Manual PDF</a>
+			</div>
+			<small>Android 7.0 o superior · instalación fuera de Play Store</small>
+		</div>
+
+		<section id="caracteristicas">
+			<h2>Qué puedes hacer</h2>
+			<div class="grid">
+				<div class="card"><h3>Gastos e ingresos</h3><p>Regístralos con categoría, fecha, nota y evidencia. Edítalos y búscalos cuando quieras.</p></div>
+				<div class="card"><h3>Bolívares y dólares</h3><p>Guarda en USD y visualiza el equivalente en Bs con la tasa del día.</p></div>
+				<div class="card"><h3>Pagos y cuotas</h3><p>Recurrentes, fecha única y compras Cashea. Una cuota se convierte en gasto al pagarla.</p></div>
+				<div class="card"><h3>Presupuestos</h3><p>Define límites mensuales por categoría y sigue cuánto llevas gastado.</p></div>
+				<div class="card"><h3>Reportes</h3><p>Resumen, distribución por categoría e historial de la tasa de cambio.</p></div>
+				<div class="card"><h3>Tu privacidad</h3><p>Sin cuentas ni analítica. PIN de 4 dígitos, huella y copias automáticas locales.</p></div>
+			</div>
+		</section>
+
+		<section id="capturas">
+			<h2>Así se ve</h2>
+			<div class="shots">
+				<figure><img src="capturas/01-inicio.webp" alt="Inicio"><figcaption>Inicio</figcaption></figure>
+				<figure><img src="capturas/02-inicio-detalle.webp" alt="Inicio desplazado"><figcaption>Inicio · detalle</figcaption></figure>
+				<figure><img src="capturas/03-reportes.webp" alt="Reportes"><figcaption>Reportes</figcaption></figure>
+				<figure><img src="capturas/04-reportes-historial.webp" alt="Reportes desplazado"><figcaption>Reportes · historial</figcaption></figure>
+				<figure><img src="capturas/05-categorias.webp" alt="Categorías"><figcaption>Categorías</figcaption></figure>
+				<figure><img src="capturas/06-pagos.webp" alt="Pagos"><figcaption>Pagos</figcaption></figure>
+				<figure><img src="capturas/07-actualizar.webp" alt="Actualizar"><figcaption>Actualizar</figcaption></figure>
+				<figure><img src="capturas/08-configuracion.webp" alt="Configuración"><figcaption>Configuración</figcaption></figure>
+			</div>
+		</section>
+
+		<section id="instalar">
+			<h2>Cómo instalar</h2>
+			<ol class="steps">
+				<li>Descarga <b>financevz-0.1.28.apk</b> desde el botón de arriba o desde Releases.</li>
+				<li>Activa en Android la opción <b>Instalar aplicaciones desconocidas</b> para el explorador o el navegador que uses.</li>
+				<li>Abre el APK y confirma la instalación. Si vienes de un build debug, desinstálalo antes: la firma es distinta.</li>
+				<li>Abre la app. No hay registro ni inicio de sesión.</li>
+			</ol>
+			<p class="note" style="margin-top:18px">
+				El APK está firmado con la clave de release del proyecto. Android/Play Protect puede mostrar una advertencia por instalarse fuera de Play Store; acepta solo si el archivo viene de este repo.
+			</p>
+		</section>
+
+		<section>
+			<h2>Más información</h2>
+			<div class="grid">
+				<div class="card"><h3>Manual de usuario</h3><p><a href="manual/manual.html">Leer en HTML</a> · <a href="manual/manual.pdf">Descargar PDF</a></p></div>
+				<div class="card"><h3>Política de privacidad</h3><p><a href="https://josefestevesp.github.io/finanzasvz-privacidad/">Ver política de privacidad</a></p></div>
+				<div class="card"><h3>Código fuente</h3><p><a href="https://github.com/JoseFEstevesP/financeVZ">Repositorio en GitHub</a></p></div>
+			</div>
+		</section>
+	</main>
+
+	<footer>
+		<span>financeVZ · finanzas personales en Android</span>
+		<span>v0.1.28 · <a href="https://github.com/JoseFEstevesP/financeVZ/releases">Releases</a></span>
+	</footer>
+</div>
+
+</body>
+</html>

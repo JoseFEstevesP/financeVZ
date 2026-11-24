@@ -19,6 +19,14 @@ El dinero se almacena como centavos en `i64`, con USD como base. La conversión 
 
 Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Política de privacidad: https://josefestevesp.github.io/finanzasvz-privacidad/
 
+## Descargar
+
+- Página web: https://josefestevesp.github.io/financeVZ/
+- APK firmado 0.1.28: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.28.apk
+- Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
+
+Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
+
 ## Capturas
 
 Pantallas reales de la app. Inicio y Reportes incluyen una vista desplazada porque el contenido no cabe en una sola pantalla.
