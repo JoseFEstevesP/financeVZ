@@ -95,7 +95,7 @@ pub fn Reports(props: ReportsProps) -> Element {
 
             div { class: "card",
                 h3 { "Tasa del dólar" }
-                p { class: "muted", "Dólar oficial (DolarAPI). Si falla, puedes escribirla a mano." }
+                p { class: "muted", "Dólar oficial del BCV. Si falla, puedes escribirla a mano." }
                 input {
                     class: "text-input",
                     value: rate_input,
