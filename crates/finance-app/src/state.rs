@@ -13,7 +13,10 @@ use finance_core::{
 use finance_store::SqliteRepository;
 use sha2::{Digest, Sha256};
 
-use crate::{bridge, platform, platform::UpdateProgress};
+use crate::{
+    bridge,
+    platform::{self, UpdateProgress, UpdateSource},
+};
 
 pub const DEFAULT_CURRENCY: &str = "USD";
 const RATE_SETTING: &str = "exchange_rate_cents";
@@ -450,27 +453,30 @@ impl AppState {
         self.payment_amount = (initial + count * installment).to_string();
     }
 
-    pub fn prepare_update(&mut self) -> Result<String, String> {
+    pub fn prepare_update(&mut self) -> Result<UpdateSource, String> {
         let base = self.update_url.trim().trim_end_matches('/').to_owned();
-        if !(base.starts_with("http://") || base.starts_with("https://")) {
-            return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
-        }
         if let Ok(repo) = self.repo.lock() {
             let _ = repo.set_setting(UPDATE_URL_SETTING, &base);
         }
-        Ok(base)
+        if base.is_empty() {
+            return Ok(UpdateSource::GitHub);
+        }
+        if !(base.starts_with("http://") || base.starts_with("https://")) {
+            return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
+        }
+        Ok(UpdateSource::Local(base))
     }
 
     pub fn update_app(&mut self, progress: &(dyn Fn(UpdateProgress) + Send + Sync)) {
-        let base = match self.prepare_update() {
-            Ok(base) => base,
+        let source = match self.prepare_update() {
+            Ok(source) => source,
             Err(message) => {
                 self.update_status = Some(message);
                 return;
             }
         };
         self.update_status = Some("Buscando actualización…".into());
-        self.update_status = Some(match platform::install_update(&base, progress) {
+        self.update_status = Some(match platform::install_update(&source, progress) {
             Ok(message) | Err(message) => message,
         });
     }
@@ -1810,6 +1816,22 @@ mod tests {
         assert_eq!(parse_cents("0"), None);
         assert_eq!(parse_cents("abc"), None);
         assert_eq!(parse_cents(""), None);
+    }
+
+    #[test]
+    fn prepare_update_uses_github_unless_local_url_is_set() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+        assert_eq!(state.prepare_update().unwrap(), UpdateSource::GitHub);
+
+        state.set_update_url("http://192.168.0.10:8000".into());
+        assert_eq!(
+            state.prepare_update().unwrap(),
+            UpdateSource::Local("http://192.168.0.10:8000".into())
+        );
+
+        state.set_update_url(String::new());
+        assert_eq!(state.prepare_update().unwrap(), UpdateSource::GitHub);
     }
 
     #[test]

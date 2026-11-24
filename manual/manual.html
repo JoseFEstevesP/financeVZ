@@ -132,9 +132,9 @@
 	<h3><span class="num">1.2</span> Instalación y primeros pasos</h3>
 	<div class="prereq-box"><strong>Antes de instalar:</strong> el APK se distribuye fuera de Play Store. Activa la instalación de aplicaciones desconocidas y usa solo APKs generados por ti. Consulta la política de privacidad en <a href="https://josefestevesp.github.io/finanzasvz-privacidad/">josefestevesp.github.io/finanzasvz-privacidad</a>.</div>
 	<ol class="checklist">
-		<li>Instala el APK desde <code>updates/financevz.apk</code> o desde el servidor local de actualizaciones.</li>
+		<li>Instala el APK desde <code>updates/financevz.apk</code> o desde la pestaña <b>Actualizar</b>, que consulta GitHub Releases.</li>
 		<li>Abre la app. No hay registro ni inicio de sesión: empiezas directamente en Inicio.</li>
-		<li>Si vas a usar el actualizador, comprueba que el móvil esté en la misma Wi-Fi que el servidor.</li>
+		<li>Si vas a usar el actualizador, comprueba que el móvil tenga internet; para el servidor local opcional, que esté en la misma Wi-Fi.</li>
 		<li>Si activas PIN o huella, configúralos desde Configuración antes de bloquear la app.</li>
 	</ol>
 	<div class="tip-box"><strong>Importante:</strong> un build debug y uno release firmado tienen firmas distintas. Para pasar de debug a release, desinstala la versión anterior y conserva antes una copia de <code>financevz.db</code> si quieres mantener los datos.</div>
@@ -255,23 +255,29 @@
 
 <h2 class="chapter-title" id="c-7">7. Actualizar la app</h2>
 <section class="module">
-	<p class="desc">La pestaña <b>Actualizar</b> permite buscar e instalar una versión nueva desde un servidor local, con verificación del archivo antes de descargarlo.</p>
-	<figure><img src="../capturas/07-actualizar.webp" alt="Pantalla de Actualizar"><figcaption>Actualizador: URL raíz, descarga e instalación manual.</figcaption></figure>
+	<p class="desc">La pestaña <b>Actualizar</b> busca la última versión publicada en GitHub Releases y muestra la fuente elegida. El campo de URL ya no es obligatorio: solo se usa para pruebas con un servidor local. El APK se descarga con verificación del SHA-256 y la instalación siempre la confirmas tú.</p>
+	<figure><img src="../capturas/07-actualizar.webp" alt="Pantalla de Actualizar"><figcaption>Actualizador: descarga y confirmación manual de la instalación.</figcaption></figure>
 
 	<h3><span class="num">7.1</span> Buscar e instalar</h3>
 	<div class="workflow-diagram wf-diagram">
-		<span class="wf-step">Servir updates/ en la PC</span><span class="wf-arrow">→</span>
-		<span class="wf-step">Escribir la URL raíz</span><span class="wf-arrow">→</span>
+		<span class="wf-step">Consultar GitHub Releases</span><span class="wf-arrow">→</span>
 		<span class="wf-step">Buscar y descargar</span><span class="wf-arrow">→</span>
 		<span class="wf-step">Instalar APK descargado</span>
 	</div>
 	<ol class="checklist">
-		<li>En la PC, ejecuta <code>python3 scripts/serve-update.sh</code>. El puerto por defecto es <code>8000</code>.</li>
-		<li>En el campo <b>URL del servidor</b> escribe solo la raíz, por ejemplo <code>http://&lt;IP-del-PC&gt;:8000</code>. No añadas <code>/update.json</code> ni el nombre del APK.</li>
-		<li>Pulsa <b>Buscar y descargar</b>. La app valida que el manifiesto tenga un <code>sha256</code> de 64 hexadecimales y comprueba el archivo antes de instalar.</li>
+		<li>Entra en <b>Actualizar</b>. Con la URL vacía, la fuente es <b>GitHub Releases (JoseFEstevesP/financeVZ)</b>: no necesitas configurar nada.</li>
+		<li>Pulsa <b>Buscar y descargar</b>. La app lee el tag, descarga el APK del release y exige un <code>digest</code> SHA-256 de 64 hexadecimales; si no coincide o no existe, no descarga nada.</li>
 		<li>Cuando termine, toca <b>Instalar APK descargado</b>. La instalación nunca se lanza automáticamente.</li>
 	</ol>
-	<div class="prereq-box"><strong>Requisitos:</strong> móvil y PC en la misma Wi-Fi, puerto abierto en el firewall si hace falta, y <code>version_code</code> del manifiesto mayor que el de la versión instalada. El servidor usa HTTP, así que úsalo solo en una red de confianza.</div>
+	<div class="prereq-box"><strong>Requisitos:</strong> el móvil necesita internet. La API pública de GitHub admite 60 consultas por hora y IP; si se agota, espera una hora o usa el servidor local de abajo.</div>
+
+	<h3><span class="num">7.2</span> Servidor local (opciones avanzadas)</h3>
+	<ol class="checklist">
+		<li>En la PC, ejecuta <code>python3 scripts/serve-update.sh</code>. El puerto por defecto es <code>8000</code>.</li>
+		<li>En la app, despliega <b>Usar un servidor local (opciones avanzadas)</b> y escribe solo la raíz, por ejemplo <code>http://&lt;IP-del-PC&gt;:8000</code>. No añadas <code>/update.json</code> ni el nombre del APK. Para volver a GitHub, borra el campo y pulsa <b>Buscar y descargar</b>.</li>
+		<li>El servidor debe publicar un <code>update.json</code> con <code>version_code</code>, <code>version_name</code>, <code>apk</code> y <code>sha256</code>. El código debe ser mayor que el instalado.</li>
+	</ol>
+	<div class="prereq-box"><strong>Requisitos del modo local:</strong> móvil y PC en la misma Wi-Fi, puerto abierto en el firewall si hace falta. El servidor usa HTTP, así que úsalo solo en una red de confianza.</div>
 	<div class="tip-box"><strong>Si falla la instalación:</strong> casi siempre es por cambio de firma (debug → release) o por no haber autorizado la instalación de aplicaciones desconocidas. Desinstala la versión anterior y vuelve a intentarlo.</div>
 </section>
 

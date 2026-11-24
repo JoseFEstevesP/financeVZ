@@ -14,7 +14,7 @@ App Android de finanzas personales para uso personal. La lógica de negocio est�
 - Proteger el acceso con PIN de 4 dígitos o con la huella del teléfono, y ajustar el tema y el tamaño de texto.
 - Crear copias automáticas locales periódicas sin permisos de almacenamiento.
 - Ver reportes visuales, balances por categoría y el historial de tasas.
-- Actualizar la app desde un servidor local, verificando el SHA-256 obligatorio del APK.
+- Actualizar la app desde GitHub Releases (o desde un servidor local opcional), verificando el SHA-256 obligatorio del APK.
 
 El dinero se almacena como centavos en `i64`, con USD como base. La conversión a bolívares se usa solo para mostrar; la tasa se lee del dólar oficial publicado por el BCV en `https://www.bcv.org.ve` y se guarda por día.
 
@@ -23,7 +23,7 @@ Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Polí
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.31: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.31.apk
+- APK firmado 0.1.32: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.32.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
@@ -89,9 +89,15 @@ El script seleccionado:
 3. Ejecuta `dx build --android -p finance-app --target <target>` y `gradlew assembleDebug` o `assembleRelease` según `MODE`.
 4. Copia el APK a `updates/financevz.apk`, escribe `updates/update.json` con su SHA-256 y actualiza el archivo de versión.
 
-El script **no instala** el APK: instala `updates/financevz.apk` en el dispositivo (por ejemplo, con `adb install -r updates/financevz.apk`). Al terminar imprime la URL que conviene poner en la app.
+El script **no instala** el APK: instala `updates/financevz.apk` en el dispositivo (por ejemplo, con `adb install -r updates/financevz.apk`). Al terminar imprime la URL local, por si decides usar el servidor en opciones avanzadas.
 
-## Servir actualizaciones
+## Actualizaciones
+
+La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.32` → código `32`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
+
+Si el campo **URL del servidor** está vacío se usa GitHub. Si algún día se guardó una URL local, bórrala y pulsa **Buscar y descargar** para volver a GitHub.
+
+### Servidor local (opciones avanzadas)
 
 En la PC, con el móvil en la misma Wi-Fi:
 
@@ -101,7 +107,7 @@ python3 scripts/serve-update.sh        # o scripts/serve-update.sh 8000
 
 El script sirve `updates/` por HTTP en `0.0.0.0`, puerto `8000` por defecto, e imprime la IP local. Abre el puerto en el firewall si hace falta.
 
-En la app, entra a **Actualizar** y escribe solo la raíz del servidor, por ejemplo:
+En la app, entra a **Actualizar**, abre **Usar un servidor local (opciones avanzadas)** y escribe solo la raíz del servidor, por ejemplo:
 
 ```text
 http://<IP-del-PC>:8000

@@ -2,6 +2,13 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.32] - 2026-11-24
+
+### Cambiado
+
+- El actualizador consulta GitHub Releases por defecto: toma el tag, el asset APK y su SHA-256 de la API pública, sin depender de un servidor local. La instalación sigue siendo manual.
+- El campo de URL del servidor local se movió a **Usar un servidor local (opciones avanzadas)**. Con el campo vacío se usa GitHub; borrarlo restablece ese comportamiento.
+
 ## [0.1.31] - 2026-11-24
 
 ### Añadido

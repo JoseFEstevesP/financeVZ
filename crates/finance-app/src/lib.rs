@@ -329,6 +329,9 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   margin: 0; opacity: 0; cursor: pointer; }
 .evidence-row { display: flex; align-items: center; gap: .625rem; margin-top: .5rem; font-size: .8125rem;
   background: var(--chip-active-bg); border: 1px solid var(--link-border); border-radius: .75rem; padding: .625rem .75rem; }
+.update-advanced { margin-top: .5rem; }
+.update-advanced summary { cursor: pointer; color: var(--link); font-size: .8125rem; font-weight: 600; }
+.update-advanced .update-input { margin-top: .25rem; }
 .update-input { width: 100%; color: var(--text); background: var(--input-bg); border: 1px solid var(--input-border);
   border-radius: .75rem; padding: .75rem .875rem; font-size: .875rem; }
 .secondary { background: var(--secondary-bg); color: var(--secondary-text); border: 1px solid var(--link-border);

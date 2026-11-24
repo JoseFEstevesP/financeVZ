@@ -21,6 +21,11 @@ pub fn Update(props: UpdateProps) -> Element {
     drop(snapshot);
     let (installed_code, installed_name) = platform::local_version();
     let cached_apk = platform::downloaded_apk_path().is_some();
+    let source_label = if update_url.trim().is_empty() {
+        "GitHub Releases (JoseFEstevesP/financeVZ)".to_owned()
+    } else {
+        format!("servidor local ({})", update_url.trim())
+    };
     let (progress_label, progress_width, indeterminate) = match progress() {
         Some(UpdateProgress::Checking) => ("Buscando actualización…".to_owned(), 0, true),
         Some(UpdateProgress::Downloading { downloaded, total }) => {
@@ -50,16 +55,23 @@ pub fn Update(props: UpdateProps) -> Element {
                 p { class: "muted",
                     "Versión instalada: {installed_name} (código {installed_code})."
                 }
+                p { class: "muted", "Fuente actual: {source_label}." }
                 p { class: "muted",
-                    "Con la PC en la misma Wi-Fi, inicia el servidor de actualizaciones."
+                    "Se busca la última versión publicada y se descarga el APK. La instalación siempre la confirmas tú con un clic; nunca se instala automáticamente."
                 }
-                label { class: "field-label", "URL del servidor" }
-                input {
-                    class: "update-input",
-                    value: update_url,
-                    placeholder: "http://192.168.0.10:8000",
-                    inputmode: "url",
-                    oninput: move |event| state.write().set_update_url(event.value()),
+                details { class: "update-advanced",
+                    summary { "Usar un servidor local (opciones avanzadas)" }
+                    p { class: "muted",
+                        "Deja la URL vacía para usar GitHub Releases. Para probar en local, inicia el servidor en la PC con la misma Wi-Fi y escribe solo la raíz, sin /update.json ni el nombre del APK."
+                    }
+                    label { class: "field-label", "URL del servidor" }
+                    input {
+                        class: "update-input",
+                        value: update_url,
+                        placeholder: "http://192.168.0.10:8000",
+                        inputmode: "url",
+                        oninput: move |event| state.write().set_update_url(event.value()),
+                    }
                 }
                 div { class: "update-actions",
                     if progress().is_some() {
@@ -90,9 +102,12 @@ pub fn Update(props: UpdateProps) -> Element {
                         disabled: progress().is_some(),
                         onclick: move |_| {
                             let mut target = state;
-                            let prepared = target.write().prepare_update();
-                            let base = match prepared {
-                                Ok(base) => base,
+                            let prepared = {
+                                let mut state_guard = target.write();
+                                state_guard.prepare_update()
+                            };
+                            let source = match prepared {
+                                Ok(source) => source,
                                 Err(message) => {
                                     target.write().update_status = Some(message);
                                     return;
@@ -113,7 +128,7 @@ pub fn Update(props: UpdateProps) -> Element {
                                         signal.set(Some(step));
                                     }
                                 };
-                                let message = match platform::download_update(&base, &callback) {
+                                let message = match platform::download_update(&source, &callback) {
                                     Ok(message) | Err(message) => message,
                                 };
                                 if let Ok(mut signal) = message_signal.lock() {
