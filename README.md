@@ -17,6 +17,20 @@ App Android de finanzas personales para uso personal. La lógica de negocio est�
 
 El dinero se almacena como centavos en `i64`, con USD como base. La conversión a bolívares se usa solo para mostrar; la tasa se obtiene de `https://ve.dolarapi.com/v1/dolares/oficial` y se guarda por día.
 
+Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Política de privacidad: https://josefestevesp.github.io/finanzasvz-privacidad/
+
+## Capturas
+
+Pantallas reales de la app. Inicio y Reportes incluyen una vista desplazada porque el contenido no cabe en una sola pantalla.
+
+| Inicio | Inicio (detalle) | Reportes | Reportes (historial) |
+| :---: | :---: | :---: | :---: |
+| <a href="capturas/01-inicio.webp"><img src="capturas/01-inicio.webp" width="150" alt="Inicio"></a> | <a href="capturas/02-inicio-detalle.webp"><img src="capturas/02-inicio-detalle.webp" width="150" alt="Inicio desplazado"></a> | <a href="capturas/03-reportes.webp"><img src="capturas/03-reportes.webp" width="150" alt="Reportes"></a> | <a href="capturas/04-reportes-historial.webp"><img src="capturas/04-reportes-historial.webp" width="150" alt="Reportes desplazados"></a> |
+
+| Categorías | Pagos | Actualizar | Configuración |
+| :---: | :---: | :---: | :---: |
+| <a href="capturas/05-categorias.webp"><img src="capturas/05-categorias.webp" width="150" alt="Categorías"></a> | <a href="capturas/06-pagos.webp"><img src="capturas/06-pagos.webp" width="150" alt="Pagos"></a> | <a href="capturas/07-actualizar.webp"><img src="capturas/07-actualizar.webp" width="150" alt="Actualizar"></a> | <a href="capturas/08-configuracion.webp"><img src="capturas/08-configuracion.webp" width="150" alt="Configuración"></a> |
+
 ## Estructura
 
 | Ruta | Contenido |
@@ -26,6 +40,8 @@ El dinero se almacena como centavos en `i64`, con USD como base. La conversión 
 | `crates/finance-app/` | UI Dioxus, puente JNI/WebView, plataforma Android y actualizador. |
 | `brand/` | Kit de marca y símbolo usado en la cabecera y en el icono de launcher. |
 | `scripts/` | Build Android, servidor de actualizaciones e instalación del icono de marca. |
+| `capturas/` | Capturas reales de la app usadas en este README y en el manual. |
+| `manual/` | Manual de usuario en HTML y PDF. Los scripts para generarlo se ignoran. |
 | `updates/` | APK generado y manifiesto de actualización (ignorado por git). |
 
 El sprite de iconos de la UI es `crates/finance-app/assets/financeVZ-pack.svg`.
