@@ -2,6 +2,18 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.31] - 2026-11-24
+
+### Añadido
+
+- Tipo de movimiento en ingresos y gastos: Efectivo, Banco · Transferencia, Banco · Pago móvil, Página externa y Otro. Se muestra en los listados y se conserva al editar, devolver o exportar/importar copias.
+- Devolución de un gasto desde Inicio y Buscar movimientos: crea un ingreso del mismo importe, fecha, tasa y canal, con la nota «Devolución de …», sin borrar el gasto original.
+- Confirmación antes de eliminar un gasto, ingreso o pago desde cualquier vista, con borrado también de la imagen de evidencia del gasto.
+
+### Cambiado
+
+- Los pagos recurrentes pasan su canal al gasto generado; Cashea se registra como Página externa sin perder su esquema de inicial y cuotas.
+
 ## [0.1.30] - 2026-11-24
 
 ### Añadido

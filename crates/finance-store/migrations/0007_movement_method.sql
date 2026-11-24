@@ -1,0 +1,2 @@
+ALTER TABLE expenses ADD COLUMN method TEXT NOT NULL DEFAULT 'other';
+ALTER TABLE incomes ADD COLUMN method TEXT NOT NULL DEFAULT 'other';

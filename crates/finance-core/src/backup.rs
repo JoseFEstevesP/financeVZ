@@ -113,6 +113,8 @@ pub struct BackupExpense {
     pub evidence_path: Option<String>,
     pub rate_cents: Option<i64>,
     pub rate_day: Option<String>,
+    #[serde(default)]
+    pub method: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,6 +128,8 @@ pub struct BackupIncome {
     pub local_date: String,
     pub rate_cents: Option<i64>,
     pub rate_day: Option<String>,
+    #[serde(default)]
+    pub method: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

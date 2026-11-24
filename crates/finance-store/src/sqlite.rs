@@ -21,6 +21,7 @@ const MIGRATIONS: &[M<'_>] = &[
     M::up(include_str!(
         "../migrations/0006_budget_and_recurring_kind.sql"
     )),
+    M::up(include_str!("../migrations/0007_movement_method.sql")),
 ];
 
 pub struct SqliteRepository {
@@ -79,7 +80,7 @@ impl SqliteRepository {
     ) -> Result<Vec<Expense>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, spent_at, local_date,
-                    evidence_path, rate_cents, rate_day
+                    evidence_path, rate_cents, rate_day, method
              FROM expenses WHERE local_date BETWEEN ?1 AND ?2
              ORDER BY local_date DESC, id DESC",
         )?;
@@ -129,8 +130,8 @@ impl SqliteRepository {
         self.conn.execute(
             "INSERT INTO incomes
              (amount_cents, currency, category_id, note, received_at, local_date,
-              rate_cents, rate_day, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+              rate_cents, rate_day, method, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 new.amount.cents(),
                 new.amount.currency().as_str(),
@@ -140,6 +141,7 @@ impl SqliteRepository {
                 new.local_date.to_string(),
                 new.rate_cents,
                 new.rate_day,
+                new.method.as_str(),
                 now,
                 now,
             ],
@@ -154,7 +156,7 @@ impl SqliteRepository {
     ) -> Result<Vec<Income>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, received_at, local_date,
-                    rate_cents, rate_day
+                    rate_cents, rate_day, method
              FROM incomes WHERE local_date BETWEEN ?1 AND ?2
              ORDER BY local_date DESC, id DESC",
         )?;
@@ -178,7 +180,7 @@ impl SqliteRepository {
         let updated = self.conn.execute(
             "UPDATE expenses SET amount_cents = ?2, currency = ?3, category_id = ?4,
                     note = ?5, spent_at = ?6, local_date = ?7, evidence_path = ?8,
-                    rate_cents = ?9, rate_day = ?10, updated_at = ?11
+                    rate_cents = ?9, rate_day = ?10, method = ?11, updated_at = ?12
              WHERE id = ?1",
             params![
                 expense.id.get(),
@@ -191,6 +193,7 @@ impl SqliteRepository {
                 expense.evidence_path,
                 expense.rate_cents,
                 expense.rate_day,
+                expense.method.as_str(),
                 now,
             ],
         )?;
@@ -202,7 +205,7 @@ impl SqliteRepository {
         let updated = self.conn.execute(
             "UPDATE incomes SET amount_cents = ?2, currency = ?3, category_id = ?4,
                     note = ?5, received_at = ?6, local_date = ?7,
-                    rate_cents = ?8, rate_day = ?9, updated_at = ?10
+                    rate_cents = ?8, rate_day = ?9, method = ?10, updated_at = ?11
              WHERE id = ?1",
             params![
                 income.id.get(),
@@ -214,6 +217,7 @@ impl SqliteRepository {
                 income.local_date.to_string(),
                 income.rate_cents,
                 income.rate_day,
+                income.method.as_str(),
                 now,
             ],
         )?;
@@ -301,7 +305,7 @@ impl SqliteRepository {
 
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, spent_at, local_date,
-                    evidence_path, rate_cents, rate_day FROM expenses ORDER BY id",
+                    evidence_path, rate_cents, rate_day, method FROM expenses ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(BackupExpense {
@@ -315,13 +319,14 @@ impl SqliteRepository {
                 evidence_path: row.get(7)?,
                 rate_cents: row.get(8)?,
                 rate_day: row.get(9)?,
+                method: row.get(10)?,
             })
         })?;
         backup.expenses = rows.collect::<Result<Vec<_>, _>>()?;
 
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, received_at, local_date,
-                    rate_cents, rate_day FROM incomes ORDER BY id",
+                    rate_cents, rate_day, method FROM incomes ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(BackupIncome {
@@ -334,6 +339,7 @@ impl SqliteRepository {
                 local_date: row.get(6)?,
                 rate_cents: row.get(7)?,
                 rate_day: row.get(8)?,
+                method: row.get(9)?,
             })
         })?;
         backup.incomes = rows.collect::<Result<Vec<_>, _>>()?;
@@ -449,8 +455,8 @@ impl SqliteRepository {
         for expense in &backup.expenses {
             tx.execute(
                 "INSERT INTO expenses (id, amount_cents, currency, category_id, note, spent_at,
-                        local_date, evidence_path, rate_cents, rate_day, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                        local_date, evidence_path, rate_cents, rate_day, method, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     expense.id,
                     expense.amount_cents,
@@ -462,6 +468,7 @@ impl SqliteRepository {
                     expense.evidence_path,
                     expense.rate_cents,
                     expense.rate_day,
+                    expense.method,
                     backup.exported_at,
                     backup.exported_at,
                 ],
@@ -470,8 +477,8 @@ impl SqliteRepository {
         for income in &backup.incomes {
             tx.execute(
                 "INSERT INTO incomes (id, amount_cents, currency, category_id, note, received_at,
-                        local_date, rate_cents, rate_day, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                        local_date, rate_cents, rate_day, method, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     income.id,
                     income.amount_cents,
@@ -482,6 +489,7 @@ impl SqliteRepository {
                     income.local_date,
                     income.rate_cents,
                     income.rate_day,
+                    income.method,
                     backup.exported_at,
                     backup.exported_at,
                 ],
@@ -705,8 +713,8 @@ fn insert_expense_on(conn: &Connection, new: &NewExpense) -> Result<ExpenseId, S
     conn.execute(
         "INSERT INTO expenses
          (amount_cents, currency, category_id, note, spent_at, local_date,
-          evidence_path, rate_cents, rate_day, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+          evidence_path, rate_cents, rate_day, method, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             new.amount.cents(),
             new.amount.currency().as_str(),
@@ -717,6 +725,7 @@ fn insert_expense_on(conn: &Connection, new: &NewExpense) -> Result<ExpenseId, S
             new.evidence_path,
             new.rate_cents,
             new.rate_day,
+            new.method.as_str(),
             now,
             now,
         ],
@@ -767,5 +776,35 @@ mod migration_tests {
             )
             .unwrap();
         assert!(budgets_exists);
+    }
+
+    #[test]
+    fn adds_method_columns_to_databases_created_before_them() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        Migrations::from_slice(&MIGRATIONS[..6])
+            .to_latest(&mut conn)
+            .unwrap();
+        conn.execute(
+            "INSERT INTO categories (name, color, created_at) VALUES ('Comida', '#fff', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+
+        Migrations::from_slice(MIGRATIONS)
+            .to_latest(&mut conn)
+            .unwrap();
+
+        conn.execute(
+            "INSERT INTO expenses (amount_cents, currency, category_id, spent_at, local_date, created_at, updated_at)
+             VALUES (100, 'USD', 1, '2026-01-01T00:00:00Z', '2026-01-01', '2026-01-01', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+        let saved: String = conn
+            .query_row("SELECT method FROM expenses WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(saved, "other");
     }
 }

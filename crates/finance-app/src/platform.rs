@@ -573,6 +573,17 @@ pub fn write_auto_backup(json: &str, keep: usize) -> Option<String> {
     Some(path.to_string_lossy().into_owned())
 }
 
+/// Borra la imagen de evidencia indicada por su ruta guardada.
+pub fn delete_evidence(path: &str) {
+    let Some(root) = app_files_dir().ok() else {
+        return;
+    };
+    let Some(name) = Path::new(path).file_name() else {
+        return;
+    };
+    let _ = std::fs::remove_file(root.join("evidence").join(name));
+}
+
 pub fn save_evidence(bytes: &[u8], name: &str) -> Result<(String, String), String> {
     let dir = app_files_dir()?.join("evidence");
     std::fs::create_dir_all(&dir).map_err(|error| format!("crear carpeta evidence: {error}"))?;

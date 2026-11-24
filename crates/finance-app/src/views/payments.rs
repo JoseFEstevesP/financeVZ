@@ -180,7 +180,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                             button {
                                 class: "icon-button",
                                 aria_label: "Eliminar pago",
-                                onclick: move |_| state.write().remove_payment(row.id),
+                                onclick: move |_| state.write().request_remove_payment(row.id),
                                 Icon { name: "close", class: "icon" }
                             }
                         }

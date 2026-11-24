@@ -69,6 +69,7 @@ fn App() -> Element {
     let pin_error = snapshot.pin_error.clone();
     let biometric_unlock = snapshot.biometric_enabled;
     let evidence = snapshot.evidence_viewer.clone();
+    let pending_delete_message = snapshot.pending_delete_message();
     let shell_class = if snapshot.is_light_theme() {
         "shell theme-light"
     } else {
@@ -131,6 +132,26 @@ fn App() -> Element {
             main { class: "content", {content} }
             if let Some(message) = toast {
                 div { class: "toast", role: "status", "{message}" }
+            }
+            if let Some(message) = pending_delete_message {
+                div { class: "overlay", role: "dialog", aria_label: "Confirmar eliminación",
+                    div { class: "modal confirm-modal",
+                        h3 { "Eliminar registro" }
+                        p { class: "muted", "{message}" }
+                        div { class: "row-buttons",
+                            button {
+                                class: "chip grow",
+                                onclick: move |_| app_state.write().cancel_remove(),
+                                "Cancelar"
+                            }
+                            button {
+                                class: "chip danger grow",
+                                onclick: move |_| app_state.write().confirm_remove(),
+                                "Eliminar"
+                            }
+                        }
+                    }
+                }
             }
             if let Some(data_url) = evidence {
                 div { class: "overlay", role: "dialog", aria_label: "Evidencia del gasto",
@@ -267,6 +288,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   border-radius: .75rem; padding: .6875rem; font-size: .875rem; cursor: pointer; text-align: left;
   display: flex; align-items: center; gap: .5rem; }
 .chip.active { border-color: var(--primary); background: var(--chip-active-bg); color: var(--text); }
+.chip.danger { border-color: var(--negative); color: var(--negative); font-weight: 600; }
 .donut-wrap { width: 11.875rem; height: 11.875rem; margin: 0 auto .75rem; }
 .legend { display: flex; flex-direction: column; gap: .5rem; }
 .legend-row { display: flex; align-items: center; gap: .5625rem; font-size: .875rem; }

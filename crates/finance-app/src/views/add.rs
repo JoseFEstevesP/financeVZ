@@ -3,7 +3,10 @@ use dioxus::prelude::*;
 use finance_core::{CategoryId, format_cents_input, format_rate};
 
 use crate::{
-    components::icon::{Icon, icon_for_category},
+    components::{
+        icon::{Icon, icon_for_category},
+        method::{MethodChips, MethodTarget},
+    },
     state::{AppState, EntryCurrency, money_usd, money_ves, parse_cents},
 };
 
@@ -139,6 +142,8 @@ pub fn Add(props: AddProps) -> Element {
                         "Usar tasa automática"
                     }
                 }
+
+                MethodChips { state, target: MethodTarget::Expense }
 
                 label { class: "field-label", "Categoría" }
                 div { class: "category-grid",

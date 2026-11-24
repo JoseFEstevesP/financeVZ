@@ -79,7 +79,7 @@
 	<h1>finanzas<span>VZ</span></h1>
 	<p class="sub">Manual de usuario</p>
 	<p class="meta">Versión 1.0 · 23 de noviembre de 2026</p>
-	<span class="badge">8 capturas reales de la app en Android (incluye vistas con scroll)</span>
+	<span class="badge">9 capturas reales de la app en Android (incluye vistas con scroll)</span>
 </div>
 
 <nav class="toc">
@@ -151,7 +151,7 @@
 	<p class="desc">Debajo aparece la distribución de gastos por categoría, con un gráfico de dona y el porcentaje de cada categoría. Es útil para ver de un vistazo hacia dónde va el dinero.</p>
 
 	<h3><span class="num">2.2</span> Últimos gastos y accesos rápidos</h3>
-	<p class="desc">El bloque <b>Últimos gastos</b> lista los movimientos recientes con categoría, fecha e importe. Desde cada fila puedes ver la evidencia adjunta, editar el gasto o eliminarlo. El botón <b>+ Añadir gasto</b> abre el formulario nuevo; <b>Ingreso</b> hace lo propio para ingresos.</p>
+	<p class="desc">El bloque <b>Últimos gastos</b> lista los movimientos recientes con categoría, fecha, tipo de movimiento e importe. Desde cada fila puedes ver la evidencia adjunta, devolver el gasto, editarlo o eliminarlo. El botón <b>+ Añadir gasto</b> abre el formulario nuevo; <b>Ingreso</b> hace lo propio para ingresos.</p>
 	<p class="desc">Los enlaces <b>Ver reportes →</b>, <b>Ver pagos →</b> y <b>Ver ingresos →</b> llevan a esas secciones. Si hay pagos pendientes, el aviso <b>Pagos por hacer: N</b> muestra cuántos tienes.</p>
 	<div class="workflow-box"><strong>Flujo típico:</strong> abre Inicio → revisa el balance → toca <b>+ Añadir gasto</b> → guarda → comprueba que el gasto aparece en Últimos gastos y en la distribución.</div>
 	<p class="extra">Desliza hacia arriba para ver la lista completa de movimientos; la pantalla tiene scroll.</p>
@@ -161,12 +161,13 @@
 <h2 class="chapter-title" id="c-3">3. Gastos e ingresos</h2>
 <section class="module">
 	<h3><span class="num">3.1</span> Registrar un gasto</h3>
-	<p class="desc">Pulsa <b>+ Añadir gasto</b> desde Inicio. El formulario permite elegir moneda (USD o Bs), escribir el importe, seleccionar categoría, poner fecha y añadir una nota opcional.</p>
+	<p class="desc">Pulsa <b>+ Añadir gasto</b> desde Inicio. El formulario permite elegir moneda (USD o Bs), escribir el importe, seleccionar el tipo de movimiento y la categoría, poner fecha y añadir una nota opcional.</p>
 	<table class="fields">
 		<thead><tr><th>Campo</th><th>Tipo</th><th>Obligatorio</th><th>Observación</th></tr></thead>
 		<tbody>
 			<tr><td>Importe</td><td>Numérico</td><td class="req">Sí</td><td>Los dígitos se escriben como centavos y se formatean al escribir; no conviertas dentro del campo.</td></tr>
 			<tr><td>Moneda</td><td>USD / Bs</td><td class="req">Sí</td><td>Si eliges Bs, se convierte a USD con la tasa vigente.</td></tr>
+			<tr><td>Tipo de movimiento</td><td>Chips</td><td class="req">Sí</td><td>Efectivo, Banco · Transferencia, Banco · Pago móvil, Página externa u Otro. Se muestra en los listados.</td></tr>
 			<tr><td>Categoría</td><td>Lista</td><td class="req">Sí</td><td>Usa las categorías de gasto creadas en Categorías.</td></tr>
 			<tr><td>Fecha del gasto</td><td>Fecha</td><td class="req">Sí</td><td>Visible como <code>dd/mm/aaaa</code>.</td></tr>
 			<tr><td>Tasa del dólar</td><td>Numérico</td><td class="opt">No</td><td>Déjala vacía para usar la automática de la fecha; si la corriges, se guarda para ese gasto.</td></tr>
@@ -175,12 +176,14 @@
 		</tbody>
 	</table>
 	<p class="desc">Termina con <b>Guardar gasto</b>. Si estás editando, el botón cambia a <b>Guardar cambios</b> y puedes <b>Cancelar edición</b>.</p>
+	<figure><img src="../capturas/09-tipo-movimiento.webp" alt="Selector de tipo de movimiento"><figcaption>Tipo de movimiento en el formulario de gasto.</figcaption></figure>
 
 	<h3><span class="num">3.2</span> Registrar un ingreso</h3>
-	<p class="desc">Desde Inicio, toca <b>Ingreso</b>. El formulario es equivalente: importe, moneda, <b>Categoría de ingreso</b>, <b>Fecha del ingreso</b>, tasa opcional y nota. Guarda con <b>Guardar ingreso</b>.</p>
+	<p class="desc">Desde Inicio, toca <b>Ingreso</b>. El formulario es equivalente: importe, moneda, <b>Tipo de movimiento</b>, <b>Categoría de ingreso</b>, <b>Fecha del ingreso</b>, tasa opcional y nota. Guarda con <b>Guardar ingreso</b>.</p>
 
 	<h3><span class="num">3.3</span> Editar, eliminar y buscar</h3>
-	<p class="desc">En la lista de Últimos gastos, los iconos de lápiz y papelera permiten <b>Editar gasto</b> y <b>Eliminar gasto</b>. <b>Buscar movimientos</b> abre la búsqueda por texto, categoría y rango de fechas. La evidencia se consulta con <b>Ver evidencia</b> y se cierra desde el visor.</p>
+	<p class="desc">En la lista de Últimos gastos, los iconos permiten <b>Devolver gasto</b>, <b>Editar gasto</b> y <b>Eliminar gasto</b>. Al eliminar aparece una confirmación; si el gasto tenía imagen de evidencia, también se borra. <b>Buscar movimientos</b> abre la búsqueda por texto, categoría y rango de fechas, con los mismos botones para gastos y de ingresos. La evidencia se consulta con <b>Ver evidencia</b> y se cierra desde el visor.</p>
+	<div class="tip-box"><strong>Devolución:</strong> toca el icono de devolución en un gasto y se crea un ingreso del mismo importe, fecha, tasa y tipo de movimiento, con la nota «Devolución de …» en la categoría <b>Otros</b>. El gasto original se conserva en el historial.</div>
 	<div class="tip-box"><strong>Consejo:</strong> si el importe escrito no coincide con lo esperado, revisa que hayas tecleado centavos (por ejemplo <code>85789</code> para 857,89) y no un número con punto decimal.</div>
 </section>
 

@@ -41,6 +41,7 @@ pub fn Incomes(props: IncomeProps) -> Element {
                     .unwrap_or_else(|| "Otros".into()),
                 income.note.clone(),
                 format_date(income.local_date),
+                income.method.label().to_owned(),
                 money_usd(cents),
                 money_ves(cents, income_rate),
             )
@@ -88,7 +89,7 @@ pub fn Incomes(props: IncomeProps) -> Element {
                 if rows.is_empty() {
                     p { class: "muted", "Tus ingresos aparecerán aquí." }
                 } else {
-                    for (id, icon, category, note, date, amount, secondary) in rows {
+                    for (id, icon, category, note, date, method, amount, secondary) in rows {
                         div { class: "expense-row",
                             div { class: "expense-icon", Icon { name: icon, class: "row-icon" } }
                             div { class: "expense-info",
@@ -96,7 +97,7 @@ pub fn Incomes(props: IncomeProps) -> Element {
                                 if let Some(note) = note {
                                     small { class: "muted", "{note}" }
                                 }
-                                small { class: "muted", "{date}" }
+                                small { class: "muted", "{date} · {method}" }
                                 if let Some(secondary) = secondary {
                                     small { class: "muted", "{secondary}" }
                                 }
@@ -111,7 +112,7 @@ pub fn Incomes(props: IncomeProps) -> Element {
                             button {
                                 class: "icon-button",
                                 aria_label: "Eliminar ingreso",
-                                onclick: move |_| app_state.write().remove_income(id),
+                                onclick: move |_| app_state.write().request_remove_income(id),
                                 Icon { name: "delete", class: "icon" }
                             }
                         }

@@ -6,8 +6,8 @@ use std::{
 use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate};
 use finance_core::{
     Backup, Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money,
-    NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus, RecurringKind,
-    RecurringPayment, RecurringPaymentId, Report, build_income_report, build_report,
+    MovementMethod, NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus,
+    RecurringKind, RecurringPayment, RecurringPaymentId, Report, build_income_report, build_report,
     format_cents_input, format_money, format_rate, usd_to_ves, ves_to_usd,
 };
 use finance_store::SqliteRepository;
@@ -76,6 +76,13 @@ pub enum PaymentKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PendingDelete {
+    Expense(ExpenseId),
+    Income(IncomeId),
+    Payment(RecurringPaymentId),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EntryCurrency {
     Usd,
     Ves,
@@ -115,6 +122,9 @@ pub struct AppState {
     pub expense_rate_input: String,
     pub evidence_path: Option<String>,
     pub evidence_name: Option<String>,
+    pub expense_method: MovementMethod,
+    pub income_method: MovementMethod,
+    pub pending_delete: Option<PendingDelete>,
     pub income_amount: String,
     pub income_date: String,
     pub income_rate_input: String,
@@ -185,6 +195,9 @@ impl AppState {
             expense_rate_input: String::new(),
             evidence_path: None,
             evidence_name: None,
+            expense_method: MovementMethod::Other,
+            income_method: MovementMethod::Other,
+            pending_delete: None,
             income_amount: String::new(),
             income_date: Local::now().date_naive().to_string(),
             income_rate_input: String::new(),
@@ -378,6 +391,41 @@ impl AppState {
         self.editing_expense = None;
         self.editing_income = None;
         self.evidence_viewer = None;
+        self.pending_delete = None;
+    }
+
+    /// Texto del aviso de confirmación; `None` cuando no hay borrado pendiente.
+    pub fn pending_delete_message(&self) -> Option<String> {
+        let target = self.pending_delete?;
+        let (label, detail) = match target {
+            PendingDelete::Expense(id) => (
+                "el gasto",
+                self.expenses
+                    .iter()
+                    .find(|item| item.id == id)
+                    .and_then(|item| item.note.clone())
+                    .unwrap_or_else(|| "seleccionado".into()),
+            ),
+            PendingDelete::Income(id) => (
+                "el ingreso",
+                self.incomes
+                    .iter()
+                    .find(|item| item.id == id)
+                    .and_then(|item| item.note.clone())
+                    .unwrap_or_else(|| "seleccionado".into()),
+            ),
+            PendingDelete::Payment(id) => (
+                "el pago",
+                self.payments
+                    .iter()
+                    .find(|item| item.id == id)
+                    .map(|item| item.name.clone())
+                    .unwrap_or_else(|| "seleccionado".into()),
+            ),
+        };
+        Some(format!(
+            "¿Eliminar {label} «{detail}»? Esta acción no se puede deshacer."
+        ))
     }
 
     pub fn clear_toast(&mut self) {
@@ -589,6 +637,7 @@ impl AppState {
             evidence_path: self.evidence_path.clone(),
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
+            method: self.expense_method,
         };
 
         let editing = self.editing_expense;
@@ -603,6 +652,7 @@ impl AppState {
                     expense.evidence_path = new.evidence_path.clone();
                     expense.rate_cents = new.rate_cents;
                     expense.rate_day = new.rate_day.clone();
+                    expense.method = new.method;
                     self.repo
                         .lock()
                         .map_err(|_| ())
@@ -642,14 +692,81 @@ impl AppState {
         }
     }
 
-    pub fn remove_expense(&mut self, id: ExpenseId) {
+    pub fn request_remove_expense(&mut self, id: ExpenseId) {
+        self.pending_delete = Some(PendingDelete::Expense(id));
+    }
+
+    pub fn remove_expense(&mut self, id: ExpenseId) -> bool {
+        let evidence = self
+            .expenses
+            .iter()
+            .find(|item| item.id == id)
+            .and_then(|item| item.evidence_path.clone());
         let result = self
             .repo
             .lock()
             .map_err(|_| ())
             .and_then(|repo| repo.delete_expense(id).map_err(|_| ()));
-        if result.is_ok() {
-            self.refresh();
+        if result.is_err() {
+            return false;
+        }
+        if let Some(path) = evidence {
+            platform::delete_evidence(&path);
+        }
+        self.refresh();
+        true
+    }
+
+    /// Una devolución conserva el gasto y crea el ingreso inverso, para que el
+    /// historial no pierda información y el balance vuelva a cuadrar.
+    pub fn refund_expense(&mut self, id: ExpenseId) {
+        let Some(expense) = self.expenses.iter().find(|item| item.id == id).cloned() else {
+            return;
+        };
+        let Some(category_id) = self
+            .income_categories
+            .iter()
+            .find(|category| category.name.trim().eq_ignore_ascii_case("otros"))
+            .or_else(|| self.income_categories.first())
+            .map(|category| category.id)
+        else {
+            self.feedback = Some("No hay categoría de ingreso para la devolución".into());
+            return;
+        };
+        let original = expense
+            .note
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .chars()
+            .take(185)
+            .collect::<String>();
+        let detail = if original.is_empty() {
+            "gasto sin nota".to_owned()
+        } else {
+            original
+        };
+        let new = NewIncome {
+            amount: expense.amount,
+            category_id,
+            note: Some(format!("Devolución de {detail}")),
+            received_at: expense.spent_at,
+            local_date: expense.local_date,
+            rate_cents: expense.rate_cents,
+            rate_day: expense.rate_day.clone(),
+            method: expense.method,
+        };
+        let result = self
+            .repo
+            .lock()
+            .map_err(|_| ())
+            .and_then(|repo| repo.insert_income(&new).map(|_| ()).map_err(|_| ()));
+        match result {
+            Ok(()) => {
+                self.refresh();
+                self.toast = Some("Devolución registrada como ingreso".into());
+            }
+            Err(()) => self.feedback = Some("No se pudo registrar la devolución".into()),
         }
     }
 
@@ -701,6 +818,7 @@ impl AppState {
             local_date: day,
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
+            method: self.income_method,
         };
 
         let editing = self.editing_income;
@@ -714,6 +832,7 @@ impl AppState {
                     income.local_date = new.local_date;
                     income.rate_cents = new.rate_cents;
                     income.rate_day = new.rate_day.clone();
+                    income.method = new.method;
                     self.repo
                         .lock()
                         .map_err(|_| ())
@@ -752,15 +871,21 @@ impl AppState {
         }
     }
 
-    pub fn remove_income(&mut self, id: IncomeId) {
+    pub fn request_remove_income(&mut self, id: IncomeId) {
+        self.pending_delete = Some(PendingDelete::Income(id));
+    }
+
+    pub fn remove_income(&mut self, id: IncomeId) -> bool {
         let result = self
             .repo
             .lock()
             .map_err(|_| ())
             .and_then(|repo| repo.delete_income(id).map_err(|_| ()));
-        if result.is_ok() {
-            self.refresh();
+        if result.is_err() {
+            return false;
         }
+        self.refresh();
+        true
     }
 
     pub fn add_category(&mut self) {
@@ -934,6 +1059,7 @@ impl AppState {
                 evidence_path: None,
                 rate_cents: Some(initial_rate),
                 rate_day: self.rate_for(today).map(|(day, _)| day.to_string()),
+                method: MovementMethod::ExternalPage,
             };
             initial_ok = self
                 .repo
@@ -1035,6 +1161,7 @@ impl AppState {
             evidence_path: None,
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
+            method: MovementMethod::from_payment_method(payment.method),
         };
         let result = self
             .repo
@@ -1050,15 +1177,40 @@ impl AppState {
         }
     }
 
-    pub fn remove_payment(&mut self, id: RecurringPaymentId) {
+    pub fn request_remove_payment(&mut self, id: RecurringPaymentId) {
+        self.pending_delete = Some(PendingDelete::Payment(id));
+    }
+
+    pub fn remove_payment(&mut self, id: RecurringPaymentId) -> bool {
         let result = self
             .repo
             .lock()
             .map_err(|_| ())
             .and_then(|repo| repo.delete_recurring_payment(id).map_err(|_| ()));
-        if result.is_ok() {
-            self.refresh();
+        if result.is_err() {
+            return false;
         }
+        self.refresh();
+        true
+    }
+
+    pub fn confirm_remove(&mut self) {
+        let Some(target) = self.pending_delete else {
+            return;
+        };
+        self.pending_delete = None;
+        let deleted = match target {
+            PendingDelete::Expense(id) => self.remove_expense(id),
+            PendingDelete::Income(id) => self.remove_income(id),
+            PendingDelete::Payment(id) => self.remove_payment(id),
+        };
+        if deleted {
+            self.toast = Some("Registro eliminado".into());
+        }
+    }
+
+    pub fn cancel_remove(&mut self) {
+        self.pending_delete = None;
     }
 
     pub fn begin_edit_expense(&mut self, id: ExpenseId) {
@@ -1071,6 +1223,7 @@ impl AppState {
         self.note = expense.note.clone().unwrap_or_default();
         self.expense_date = expense.local_date.to_string();
         self.category_id = Some(expense.category_id);
+        self.expense_method = expense.method;
         self.entry_currency = EntryCurrency::Usd;
         self.expense_rate_input = expense.rate_cents.map(input_from_cents).unwrap_or_default();
         self.evidence_path = expense.evidence_path.clone();
@@ -1093,6 +1246,7 @@ impl AppState {
         self.income_note = income.note.clone().unwrap_or_default();
         self.income_date = income.local_date.to_string();
         self.income_category_id = Some(income.category_id);
+        self.income_method = income.method;
         self.income_entry_currency = EntryCurrency::Usd;
         self.income_rate_input = income.rate_cents.map(input_from_cents).unwrap_or_default();
         self.feedback = None;
@@ -1703,6 +1857,40 @@ mod tests {
         let expenses = repo.expenses_between(day, day).unwrap();
         assert_eq!(expenses.len(), 1);
         assert_eq!(expenses[0].rate_cents, Some(12000));
+    }
+
+    #[test]
+    fn refund_creates_income_and_keeps_the_expense() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+        let day = chrono::NaiveDate::from_ymd_opt(2026, 11, 23).unwrap();
+        state.refresh();
+        state.category_id = Some(state.categories[0].id);
+        state.amount = "1550".into();
+        state.note = "Almuerzo".into();
+        state.expense_date = day.to_string();
+        state.expense_method = MovementMethod::BankTransfer;
+        state.add_expense();
+
+        let expense = state.expenses[0].clone();
+        state.refund_expense(expense.id);
+
+        assert_eq!(state.expenses.len(), 1, "el gasto original se conserva");
+        assert_eq!(state.incomes.len(), 1);
+        let income = &state.incomes[0];
+        assert_eq!(income.amount, expense.amount);
+        assert_eq!(income.local_date, expense.local_date);
+        assert_eq!(income.method, MovementMethod::BankTransfer);
+        assert_eq!(income.note.as_deref(), Some("Devolución de Almuerzo"));
+        let category = state
+            .income_categories
+            .iter()
+            .find(|c| c.id == income.category_id)
+            .unwrap();
+        assert!(
+            category.name.eq_ignore_ascii_case("otros")
+                || category.name.eq_ignore_ascii_case("other")
+        );
     }
 
     #[test]

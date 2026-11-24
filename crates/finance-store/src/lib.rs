@@ -10,8 +10,8 @@ mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDate};
     use finance_core::{
-        Backup, Currency, Money, NewExpense, NewIncome, NewRecurringPayment, PaymentMethod,
-        PaymentStatus,
+        Backup, Currency, Money, MovementMethod, NewExpense, NewIncome, NewRecurringPayment,
+        PaymentMethod, PaymentStatus,
     };
 
     #[test]
@@ -36,6 +36,7 @@ mod tests {
             evidence_path: None,
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::Other,
         };
         let expense_id = repo.insert_expense(&new).unwrap();
 
@@ -46,6 +47,7 @@ mod tests {
         assert_eq!(expenses[0].id, expense_id);
         assert_eq!(expenses[0].amount.cents(), 1250);
         assert_eq!(expenses[0].note.as_deref(), Some("almuerzo"));
+        assert_eq!(expenses[0].method, MovementMethod::Other);
 
         let report = repo.report_between(from, to).unwrap();
         assert_eq!(report.total.cents(), 1250);
@@ -76,6 +78,7 @@ mod tests {
             local_date: day,
             rate_cents: Some(85789),
             rate_day: Some(day.to_string()),
+            method: MovementMethod::Other,
         };
         let id = repo.insert_income(&new).unwrap();
         let incomes = repo.incomes_between(day, day).unwrap();
@@ -134,6 +137,7 @@ mod tests {
             evidence_path: None,
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::Other,
         };
         repo.pay_recurring_payment(id, &expense).unwrap();
 
@@ -179,6 +183,7 @@ mod tests {
             evidence_path: None,
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::Other,
         };
         repo.pay_recurring_payment(id, &expense).unwrap();
         assert_eq!(
@@ -211,6 +216,7 @@ mod tests {
             evidence_path: Some("/tmp/recibo.jpg".into()),
             rate_cents: Some(85789),
             rate_day: Some(day21.to_string()),
+            method: MovementMethod::Other,
         };
         let id = repo.insert_expense(&new).unwrap();
         let saved = repo
@@ -222,6 +228,29 @@ mod tests {
         assert_eq!(saved.evidence_path.as_deref(), Some("/tmp/recibo.jpg"));
         assert_eq!(saved.rate_cents, Some(85789));
         assert_eq!(saved.rate_day.as_deref(), Some("2026-11-21"));
+    }
+
+    #[test]
+    fn persists_income_method() {
+        let repo = SqliteRepository::open_in_memory().unwrap();
+        let day = NaiveDate::from_ymd_opt(2026, 11, 23).unwrap();
+        let category_id = repo.add_income_category("Nómina", None, "#0f0").unwrap();
+        repo.insert_income(&NewIncome {
+            amount: Money::new(100000, Currency::new("USD").unwrap()).unwrap(),
+            category_id,
+            note: Some("Quincena".into()),
+            received_at: DateTime::parse_from_rfc3339("2026-11-23T09:00:00-04:00").unwrap(),
+            local_date: day,
+            rate_cents: None,
+            rate_day: None,
+            method: MovementMethod::Cash,
+        })
+        .unwrap();
+
+        assert_eq!(
+            repo.incomes_between(day, day).unwrap()[0].method,
+            MovementMethod::Cash
+        );
     }
 
     #[test]
@@ -245,6 +274,7 @@ mod tests {
             evidence_path: None,
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::BankTransfer,
         })
         .unwrap();
 
@@ -261,6 +291,10 @@ mod tests {
 
         repo.import_backup(&backup).unwrap();
         assert_eq!(repo.expenses_between(day, day).unwrap().len(), 1);
+        assert_eq!(
+            repo.expenses_between(day, day).unwrap()[0].method,
+            MovementMethod::BankTransfer
+        );
         assert_eq!(repo.categories().unwrap().len(), 1);
         assert_eq!(repo.budgets().unwrap().len(), 1);
         assert_eq!(repo.rate_details().unwrap()[0].2, "dolarapi");

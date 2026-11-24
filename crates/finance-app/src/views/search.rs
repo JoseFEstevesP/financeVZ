@@ -47,6 +47,7 @@ pub fn Search(props: SearchProps) -> Element {
                 category,
                 expense.note.clone(),
                 format_date(expense.local_date),
+                expense.method.label().to_owned(),
                 money_usd(expense.amount.cents()),
             )
         })
@@ -72,6 +73,7 @@ pub fn Search(props: SearchProps) -> Element {
                 category,
                 income.note.clone(),
                 format_date(income.local_date),
+                income.method.label().to_owned(),
                 money_usd(income.amount.cents()),
             )
         })
@@ -132,7 +134,7 @@ pub fn Search(props: SearchProps) -> Element {
                 if expense_rows.is_empty() {
                     p { class: "muted", "Sin resultados." }
                 } else {
-                    for (id, icon, category, note, date, amount) in expense_rows {
+                    for (id, icon, category, note, date, method, amount) in expense_rows {
                         div { class: "expense-row",
                             div { class: "expense-icon", Icon { name: icon, class: "row-icon" } }
                             div { class: "expense-info",
@@ -140,14 +142,26 @@ pub fn Search(props: SearchProps) -> Element {
                                 if let Some(note) = note {
                                     small { class: "muted", "{note}" }
                                 }
-                                small { class: "muted", "{date}" }
+                                small { class: "muted", "{date} · {method}" }
                             }
                             span { class: "expense-amount", "{amount}" }
+                            button {
+                                class: "icon-button",
+                                aria_label: "Devolver gasto",
+                                onclick: move |_| app_state.write().refund_expense(id),
+                                Icon { name: "income", class: "icon" }
+                            }
                             button {
                                 class: "icon-button",
                                 aria_label: "Editar gasto",
                                 onclick: move |_| app_state.write().begin_edit_expense(id),
                                 Icon { name: "edit", class: "icon" }
+                            }
+                            button {
+                                class: "icon-button",
+                                aria_label: "Eliminar gasto",
+                                onclick: move |_| app_state.write().request_remove_expense(id),
+                                Icon { name: "delete", class: "icon" }
                             }
                         }
                     }
@@ -159,7 +173,7 @@ pub fn Search(props: SearchProps) -> Element {
                 if income_rows.is_empty() {
                     p { class: "muted", "Sin resultados." }
                 } else {
-                    for (id, icon, category, note, date, amount) in income_rows {
+                    for (id, icon, category, note, date, method, amount) in income_rows {
                         div { class: "expense-row",
                             div { class: "expense-icon", Icon { name: icon, class: "row-icon" } }
                             div { class: "expense-info",
@@ -167,7 +181,7 @@ pub fn Search(props: SearchProps) -> Element {
                                 if let Some(note) = note {
                                     small { class: "muted", "{note}" }
                                 }
-                                small { class: "muted", "{date}" }
+                                small { class: "muted", "{date} · {method}" }
                             }
                             span { class: "expense-amount", "{amount}" }
                             button {
@@ -175,6 +189,12 @@ pub fn Search(props: SearchProps) -> Element {
                                 aria_label: "Editar ingreso",
                                 onclick: move |_| app_state.write().begin_edit_income(id),
                                 Icon { name: "edit", class: "icon" }
+                            }
+                            button {
+                                class: "icon-button",
+                                aria_label: "Eliminar ingreso",
+                                onclick: move |_| app_state.write().request_remove_income(id),
+                                Icon { name: "delete", class: "icon" }
                             }
                         }
                     }

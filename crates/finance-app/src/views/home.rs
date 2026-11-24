@@ -19,6 +19,7 @@ struct RecentRow {
     icon: &'static str,
     category: String,
     date: String,
+    method: String,
     amount: String,
     secondary: Option<String>,
     evidence: Option<String>,
@@ -56,6 +57,7 @@ pub fn Home(props: HomeProps) -> Element {
                     .map(|category| category.name.clone())
                     .unwrap_or_else(|| "Otros".into()),
                 date: format_date(expense.local_date),
+                method: expense.method.label().to_owned(),
                 amount: money_usd(cents),
                 secondary: money_ves(cents, expense_rate),
                 evidence: expense.evidence_path.clone(),
@@ -185,7 +187,7 @@ pub fn Home(props: HomeProps) -> Element {
                             div { class: "expense-info",
                                 strong { "{expense.category}" }
                                 small { class: "muted",
-                                    "{expense.date}"
+                                    "{expense.date} · {expense.method}"
                                     if let Some(path) = expense.evidence {
                                         button {
                                             class: "icon-button",
@@ -202,6 +204,12 @@ pub fn Home(props: HomeProps) -> Element {
                             span { class: "expense-amount", "{expense.amount}" }
                             button {
                                 class: "icon-button",
+                                aria_label: "Devolver gasto",
+                                onclick: move |_| app_state.write().refund_expense(expense.id),
+                                Icon { name: "income", class: "icon" }
+                            }
+                            button {
+                                class: "icon-button",
                                 aria_label: "Editar gasto",
                                 onclick: move |_| app_state.write().begin_edit_expense(expense.id),
                                 Icon { name: "edit", class: "icon" }
@@ -209,7 +217,7 @@ pub fn Home(props: HomeProps) -> Element {
                             button {
                                 class: "icon-button",
                                 aria_label: "Eliminar gasto",
-                                onclick: move |_| app_state.write().remove_expense(expense.id),
+                                onclick: move |_| app_state.write().request_remove_expense(expense.id),
                                 Icon { name: "close", class: "icon" }
                             }
                         }

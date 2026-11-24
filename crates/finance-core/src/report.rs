@@ -127,6 +127,7 @@ mod tests {
     use crate::{
         ids::{CategoryId, ExpenseId, IncomeId},
         income::Income,
+        method::MovementMethod,
         money::Currency,
     };
     use chrono::{DateTime, NaiveDate};
@@ -155,6 +156,7 @@ mod tests {
             evidence_path: None,
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::Other,
         }
     }
 
@@ -191,6 +193,7 @@ mod tests {
             local_date: NaiveDate::from_ymd_opt(2026, 11, day).unwrap(),
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::Other,
         };
         let incomes = vec![
             make_income(1, 1, 100000, 5),

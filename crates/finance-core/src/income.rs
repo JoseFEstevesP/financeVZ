@@ -3,6 +3,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate};
 use crate::{
     error::DomainError,
     ids::{CategoryId, IncomeId},
+    method::MovementMethod,
     money::Money,
 };
 
@@ -15,6 +16,7 @@ pub struct NewIncome {
     pub local_date: NaiveDate,
     pub rate_cents: Option<i64>,
     pub rate_day: Option<String>,
+    pub method: MovementMethod,
 }
 
 impl NewIncome {
@@ -46,6 +48,7 @@ pub struct Income {
     pub local_date: NaiveDate,
     pub rate_cents: Option<i64>,
     pub rate_day: Option<String>,
+    pub method: MovementMethod,
 }
 
 impl Income {
@@ -59,6 +62,7 @@ impl Income {
             local_date: new.local_date,
             rate_cents: new.rate_cents,
             rate_day: new.rate_day,
+            method: new.method,
         }
     }
 }
@@ -77,6 +81,7 @@ mod tests {
             local_date,
             rate_cents: None,
             rate_day: None,
+            method: MovementMethod::Other,
         }
     }
 

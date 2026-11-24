@@ -4,7 +4,8 @@ App Android de finanzas personales para uso personal. La lógica de negocio est�
 
 ## Qué permite hacer
 
-- Registrar y editar gastos e ingresos, con categorías y tasa de cambio.
+- Registrar y editar gastos e ingresos, con categorías, tipo de movimiento (efectivo, transferencia, pago móvil, página externa u otro) y tasa de cambio.
+- Devolver un gasto como ingreso y eliminar movimientos o pagos con confirmación.
 - Registrar pagos y gastos recurrentes, y cuotas (incluido Cashea).
 - Definir presupuestos mensuales por categoría.
 - Buscar y filtrar movimientos por texto, categoría y rango de fechas.
@@ -22,7 +23,7 @@ Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Polí
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.30: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.30.apk
+- APK firmado 0.1.31: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.31.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
@@ -39,12 +40,16 @@ Pantallas reales de la app. Inicio y Reportes incluyen una vista desplazada porq
 | :---: | :---: | :---: | :---: |
 | <a href="capturas/05-categorias.webp"><img src="capturas/05-categorias.webp" width="150" alt="Categorías"></a> | <a href="capturas/06-pagos.webp"><img src="capturas/06-pagos.webp" width="150" alt="Pagos"></a> | <a href="capturas/07-actualizar.webp"><img src="capturas/07-actualizar.webp" width="150" alt="Actualizar"></a> | <a href="capturas/08-configuracion.webp"><img src="capturas/08-configuracion.webp" width="150" alt="Configuración"></a> |
 
+| Tipo de movimiento |
+| :---: |
+| <a href="capturas/09-tipo-movimiento.webp"><img src="capturas/09-tipo-movimiento.webp" width="150" alt="Selector de tipo de movimiento"></a> |
+
 ## Estructura
 
 | Ruta | Contenido |
 | --- | --- |
 | `crates/finance-core/` | Dominio: dinero, categorías, gastos, ingresos, pagos y reportes. |
-| `crates/finance-store/` | Repositorio SQLite y migraciones `0001` a `0006` en `crates/finance-store/migrations/`. |
+| `crates/finance-store/` | Repositorio SQLite y migraciones `0001` a `0007` en `crates/finance-store/migrations/`. |
 | `crates/finance-app/` | UI Dioxus, puente JNI/WebView, plataforma Android y actualizador. |
 | `brand/` | Kit de marca y símbolo usado en la cabecera y en el icono de launcher. |
 | `scripts/` | Build Android, servidor de actualizaciones e instalación del icono de marca. |

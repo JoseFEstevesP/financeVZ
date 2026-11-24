@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate};
 use finance_core::{
-    Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money, PaymentMethod,
-    RecurringKind, RecurringPayment, RecurringPaymentId,
+    Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money, MovementMethod,
+    PaymentMethod, RecurringKind, RecurringPayment, RecurringPaymentId,
 };
 use rusqlite::{Error, Row, types::Type};
 
@@ -39,6 +39,7 @@ pub fn expense_from_row(row: &Row<'_>) -> Result<Expense, Error> {
         evidence_path: row.get("evidence_path")?,
         rate_cents: row.get("rate_cents")?,
         rate_day: row.get("rate_day")?,
+        method: MovementMethod::parse(&row.get::<_, String>("method")?),
     })
 }
 
@@ -60,6 +61,7 @@ pub fn income_from_row(row: &Row<'_>) -> Result<Income, Error> {
         local_date,
         rate_cents: row.get("rate_cents")?,
         rate_day: row.get("rate_day")?,
+        method: MovementMethod::parse(&row.get::<_, String>("method")?),
     })
 }
 
