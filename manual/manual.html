@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de usuario — finanzasVZ</title>
+<style>
+	:root { --brand:#316cdb; --accent:#0f9d78; --ink:#1e293b; --soft:#64748b; --line:#dbe3f0; --bg:#f7f9fd; }
+	* { box-sizing: border-box; }
+	body { font-family: 'Segoe UI', system-ui, sans-serif; color: var(--ink); font-size: 11.3px; line-height: 1.55; margin: 0; }
+	code { background:#eef4ff; color:#1e40af; padding:1px 5px; border-radius:4px; font-size:10px; }
+	a { color: var(--brand); }
+
+	@page { size: A4; margin: 16mm 14mm 18mm; }
+
+	.cover { page-break-after: always; display:flex; flex-direction:column; justify-content:center; height: 92vh; text-align:center; }
+	.cover .mark { display:block; width:56px; height:56px; margin:0 auto 20px; color:var(--accent); }
+	.cover h1 { font-size: 40px; margin: 0 0 8px; letter-spacing:.5px; }
+	.cover h1 span { color: var(--brand); }
+	.cover .sub { color: var(--soft); font-size: 15px; margin-bottom: 38px; }
+	.cover .meta { color: var(--soft); font-size: 12px; }
+	.cover .badge { display:inline-block; margin-top:18px; border:1px solid var(--line); border-radius:999px; padding:6px 18px; color:var(--soft); }
+
+	.toc { page-break-after: always; }
+	.toc h2 { color: var(--brand); font-size: 24px; border-bottom: 3px solid var(--brand); padding-bottom: 8px; }
+	.toc ol { list-style: none; padding: 0; columns: 2; column-gap: 40px; }
+	.toc li { padding: 3px 0; break-inside: avoid; }
+	.toc-chapter { font-weight: 700; margin-top: 10px; font-size: 12px; }
+	.toc-section { padding-left: 18px; color: var(--soft); font-size: 10.8px; }
+
+	.chapter-title { page-break-before: always; color: var(--brand); font-size: 26px; border-bottom: 3px solid var(--brand); padding-bottom: 8px; margin-top: 0; }
+	.module { margin-top: 24px; }
+	.module h3 { font-size: 17px; margin: 0 0 6px; }
+	.module h3 .num { color: var(--brand); }
+	.module h4 { font-size: 12.5px; margin: 14px 0 6px; }
+	.desc { margin: 0 0 6px; }
+	.extra { margin: 0 0 6px; color: var(--soft); font-style: italic; }
+
+	.intro-text { font-size: 12.5px; line-height: 1.7; margin: 10px 0 16px; }
+	.areas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+	.area-card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; break-inside: avoid; }
+	.area-card h4 { margin: 0 0 4px; font-size: 12px; color: var(--brand); }
+	.area-card p { margin: 0; font-size: 10.5px; color: var(--soft); }
+
+	.purpose-box { background:#eff6ff; border-left:3px solid var(--brand); padding:8px 12px; margin:8px 0; font-size:11px; border-radius:0 6px 6px 0; break-inside:avoid; }
+	.purpose-box strong { color:#1e40af; }
+	.prereq-box { background:#fffbeb; border-left:3px solid #d97706; padding:8px 12px; margin:8px 0; font-size:11px; border-radius:0 6px 6px 0; break-inside:avoid; }
+	.prereq-box strong { color:#92400e; }
+	.workflow-box { background:#f0fdf4; border-left:3px solid #16a34a; padding:8px 12px; margin:8px 0; font-size:11px; border-radius:0 6px 6px 0; break-inside:avoid; }
+	.workflow-box strong { color:#15803d; }
+	.tip-box { background:#faf5ff; border-left:3px solid #9333ea; padding:8px 12px; margin:8px 0; font-size:11px; border-radius:0 6px 6px 0; break-inside:avoid; }
+	.tip-box strong { color:#7e22ce; }
+
+	.checklist { list-style:none; padding:0; margin:10px 0; }
+	.checklist li { padding:4px 0 4px 24px; position:relative; font-size:11px; }
+	.checklist li::before { content:'\2610'; position:absolute; left:0; color:var(--brand); font-size:13px; }
+
+	.wf-diagram { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:12px 0; padding:12px; background:var(--bg); border-radius:8px; border:1px solid var(--line); }
+	.wf-step { background:var(--brand); color:#fff; padding:6px 12px; border-radius:6px; font-size:10.5px; font-weight:600; }
+	.wf-arrow { color:var(--soft); font-size:15px; font-weight:700; }
+
+	figure { margin:12px 0; break-inside:avoid; text-align:center; }
+	figure img { width:56mm; max-width:100%; border:1px solid var(--line); border-radius:8px; }
+	figcaption { font-size:9.5px; color:var(--soft); margin-top:4px; }
+
+	table.fields { width:100%; border-collapse:collapse; font-size:10px; margin:4px 0 8px; }
+	table.fields th { background:var(--bg); text-align:left; padding:5px 8px; border:1px solid var(--line); }
+	table.fields td { padding:4px 8px; border:1px solid var(--line); vertical-align:top; }
+	td.req { color:var(--brand); font-weight:600; white-space:nowrap; }
+	td.opt { color:var(--soft); white-space:nowrap; }
+
+	@media print { .chapter-title { page-break-before: always; } }
+</style>
+</head>
+<body>
+
+<div class="cover">
+	<svg class="mark" viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M58 136h32a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H58a14 14 0 0 1-14-14v-52a14 14 0 0 1 14-14Zm60-40h32a14 14 0 0 1 14 14v92a14 14 0 0 1-14 14h-32a14 14 0 0 1-14-14v-92a14 14 0 0 1 14-14Zm60-20h32a14 14 0 0 1 14 14v112a14 14 0 0 1-14 14h-32a14 14 0 0 1-14-14V90a14 14 0 0 1 14-14Zm14-58 34 56h-68Z"/></svg>
+	<h1>finanzas<span>VZ</span></h1>
+	<p class="sub">Manual de usuario</p>
+	<p class="meta">Versión 1.0 · 23 de noviembre de 2026</p>
+	<span class="badge">8 capturas reales de la app en Android (incluye vistas con scroll)</span>
+</div>
+
+<nav class="toc">
+	<h2>Contenido</h2>
+	<ol>
+		<li class="toc-chapter">1. Antes de empezar</li>
+		<li class="toc-section">1.1 Qué es finanzasVZ</li>
+		<li class="toc-section">1.2 Instalación y primeros pasos</li>
+		<li class="toc-section">1.3 Cómo se organiza la pantalla</li>
+		<li class="toc-chapter">2. Inicio</li>
+		<li class="toc-section">2.1 Resumen del mes</li>
+		<li class="toc-section">2.2 Últimos gastos y accesos rápidos</li>
+		<li class="toc-chapter">3. Gastos e ingresos</li>
+		<li class="toc-section">3.1 Registrar un gasto</li>
+		<li class="toc-section">3.2 Registrar un ingreso</li>
+		<li class="toc-section">3.3 Editar, eliminar y buscar</li>
+		<li class="toc-chapter">4. Reportes</li>
+		<li class="toc-section">4.1 Períodos y categorías</li>
+		<li class="toc-section">4.2 Tasa del dólar</li>
+		<li class="toc-chapter">5. Categorías y presupuestos</li>
+		<li class="toc-section">5.1 Crear categorías</li>
+		<li class="toc-section">5.2 Presupuestos mensuales</li>
+		<li class="toc-chapter">6. Pagos y cuotas</li>
+		<li class="toc-section">6.1 Pagos por hacer</li>
+		<li class="toc-section">6.2 Crear un pago</li>
+		<li class="toc-section">6.3 Cashea</li>
+		<li class="toc-chapter">7. Actualizar la app</li>
+		<li class="toc-section">7.1 Buscar e instalar</li>
+		<li class="toc-chapter">8. Configuración</li>
+		<li class="toc-section">8.1 Tema y tamaño de texto</li>
+		<li class="toc-section">8.2 Copias de seguridad</li>
+		<li class="toc-section">8.3 PIN y huella</li>
+		<li class="toc-chapter">9. Datos, copias y privacidad</li>
+		<li class="toc-chapter">10. Preguntas frecuentes</li>
+	</ol>
+</nav>
+
+<h2 class="chapter-title" id="c-1">1. Antes de empezar</h2>
+<section class="module">
+	<h3><span class="num">1.1</span> Qué es finanzasVZ</h3>
+	<p class="desc">finanzasVZ es una app Android de finanzas personales para uso personal. Toda la lógica está en Rust y la interfaz se muestra dentro de un WebView con Dioxus. Los datos viven en SQLite en el propio teléfono: no hay cuentas de usuario ni servidor propio.</p>
+	<div class="purpose-box"><strong>Para qué sirve:</strong> llevar el control de gastos e ingresos en bolívares y dólares, programar pagos y cuotas, definir presupuestos por categoría y ver reportes, sin depender de la nube.</div>
+	<div class="areas-grid">
+		<div class="area-card"><h4>Dinero</h4><p>Se guarda en centavos como entero y la base es USD. Los bolívares son solo una vista usando la tasa del día.</p></div>
+		<div class="area-card"><h4>Tasa de cambio</h4><p>Se toma de DolarAPI (promedio oficial BCV) y se guarda por fecha. Si no hay tasa del día, se usa la última anterior.</p></div>
+		<div class="area-card"><h4>Fechas</h4><p>En pantalla se muestran como <code>dd/mm/aaaa</code>. Internamente se guardan en formato ISO.</p></div>
+		<div class="area-card"><h4>Privacidad</h4><p>Sin anuncios ni analítica. La única conexión externa es la consulta de la tasa, sin datos personales.</p></div>
+	</div>
+
+	<h3><span class="num">1.2</span> Instalación y primeros pasos</h3>
+	<div class="prereq-box"><strong>Antes de instalar:</strong> el APK se distribuye fuera de Play Store. Activa la instalación de aplicaciones desconocidas y usa solo APKs generados por ti. Consulta la política de privacidad en <a href="https://josefestevesp.github.io/finanzasvz-privacidad/">josefestevesp.github.io/finanzasvz-privacidad</a>.</div>
+	<ol class="checklist">
+		<li>Instala el APK desde <code>updates/financevz.apk</code> o desde el servidor local de actualizaciones.</li>
+		<li>Abre la app. No hay registro ni inicio de sesión: empiezas directamente en Inicio.</li>
+		<li>Si vas a usar el actualizador, comprueba que el móvil esté en la misma Wi-Fi que el servidor.</li>
+		<li>Si activas PIN o huella, configúralos desde Configuración antes de bloquear la app.</li>
+	</ol>
+	<div class="tip-box"><strong>Importante:</strong> un build debug y uno release firmado tienen firmas distintas. Para pasar de debug a release, desinstala la versión anterior y conserva antes una copia de <code>financevz.db</code> si quieres mantener los datos.</div>
+
+	<h3><span class="num">1.3</span> Cómo se organiza la pantalla</h3>
+	<p class="desc">La app tiene una cabecera con el logo (vuelve a Inicio) y una tuerca (abre Configuración). Abajo hay un menú fijo con cuatro pestañas: <b>Reportes</b>, <b>Categorías</b>, <b>Pagos</b> y <b>Actualizar</b>. Inicio se abre tocando el logo; no hay botón flotante central.</p>
+	<figure><img src="../capturas/01-inicio.webp" alt="Pantalla de Inicio de finanzasVZ"><figcaption>Estructura general: cabecera, contenido y menú inferior.</figcaption></figure>
+</section>
+
+<h2 class="chapter-title" id="c-2">2. Inicio</h2>
+<section class="module">
+	<h3><span class="num">2.1</span> Resumen del mes</h3>
+	<p class="desc">La tarjeta principal muestra el balance, los gastos y los ingresos del mes en USD, con su equivalente en bolívares al lado. La tarjeta de tasa indica el valor usado y su origen (automático o manual).</p>
+	<p class="desc">Debajo aparece la distribución de gastos por categoría, con un gráfico de dona y el porcentaje de cada categoría. Es útil para ver de un vistazo hacia dónde va el dinero.</p>
+
+	<h3><span class="num">2.2</span> Últimos gastos y accesos rápidos</h3>
+	<p class="desc">El bloque <b>Últimos gastos</b> lista los movimientos recientes con categoría, fecha e importe. Desde cada fila puedes ver la evidencia adjunta, editar el gasto o eliminarlo. El botón <b>+ Añadir gasto</b> abre el formulario nuevo; <b>Ingreso</b> hace lo propio para ingresos.</p>
+	<p class="desc">Los enlaces <b>Ver reportes →</b>, <b>Ver pagos →</b> y <b>Ver ingresos →</b> llevan a esas secciones. Si hay pagos pendientes, el aviso <b>Pagos por hacer: N</b> muestra cuántos tienes.</p>
+	<div class="workflow-box"><strong>Flujo típico:</strong> abre Inicio → revisa el balance → toca <b>+ Añadir gasto</b> → guarda → comprueba que el gasto aparece en Últimos gastos y en la distribución.</div>
+	<p class="extra">Desliza hacia arriba para ver la lista completa de movimientos; la pantalla tiene scroll.</p>
+	<figure><img src="../capturas/02-inicio-detalle.webp" alt="Inicio desplazado a Últimos gastos"><figcaption>Inicio desplazado: distribución y últimos gastos.</figcaption></figure>
+</section>
+
+<h2 class="chapter-title" id="c-3">3. Gastos e ingresos</h2>
+<section class="module">
+	<h3><span class="num">3.1</span> Registrar un gasto</h3>
+	<p class="desc">Pulsa <b>+ Añadir gasto</b> desde Inicio. El formulario permite elegir moneda (USD o Bs), escribir el importe, seleccionar categoría, poner fecha y añadir una nota opcional.</p>
+	<table class="fields">
+		<thead><tr><th>Campo</th><th>Tipo</th><th>Obligatorio</th><th>Observación</th></tr></thead>
+		<tbody>
+			<tr><td>Importe</td><td>Numérico</td><td class="req">Sí</td><td>Los dígitos se escriben como centavos y se formatean al escribir; no conviertas dentro del campo.</td></tr>
+			<tr><td>Moneda</td><td>USD / Bs</td><td class="req">Sí</td><td>Si eliges Bs, se convierte a USD con la tasa vigente.</td></tr>
+			<tr><td>Categoría</td><td>Lista</td><td class="req">Sí</td><td>Usa las categorías de gasto creadas en Categorías.</td></tr>
+			<tr><td>Fecha del gasto</td><td>Fecha</td><td class="req">Sí</td><td>Visible como <code>dd/mm/aaaa</code>.</td></tr>
+			<tr><td>Tasa del dólar</td><td>Numérico</td><td class="opt">No</td><td>Déjala vacía para usar la automática de la fecha; si la corriges, se guarda para ese gasto.</td></tr>
+			<tr><td>Evidencia</td><td>Imagen</td><td class="opt">No</td><td><b>Adjuntar imagen</b> o <b>Toca para elegir una foto</b>; se puede quitar antes de guardar.</td></tr>
+			<tr><td>Nota</td><td>Texto</td><td class="opt">No</td><td>Hasta 200 caracteres.</td></tr>
+		</tbody>
+	</table>
+	<p class="desc">Termina con <b>Guardar gasto</b>. Si estás editando, el botón cambia a <b>Guardar cambios</b> y puedes <b>Cancelar edición</b>.</p>
+
+	<h3><span class="num">3.2</span> Registrar un ingreso</h3>
+	<p class="desc">Desde Inicio, toca <b>Ingreso</b>. El formulario es equivalente: importe, moneda, <b>Categoría de ingreso</b>, <b>Fecha del ingreso</b>, tasa opcional y nota. Guarda con <b>Guardar ingreso</b>.</p>
+
+	<h3><span class="num">3.3</span> Editar, eliminar y buscar</h3>
+	<p class="desc">En la lista de Últimos gastos, los iconos de lápiz y papelera permiten <b>Editar gasto</b> y <b>Eliminar gasto</b>. <b>Buscar movimientos</b> abre la búsqueda por texto, categoría y rango de fechas. La evidencia se consulta con <b>Ver evidencia</b> y se cierra desde el visor.</p>
+	<div class="tip-box"><strong>Consejo:</strong> si el importe escrito no coincide con lo esperado, revisa que hayas tecleado centavos (por ejemplo <code>85789</code> para 857,89) y no un número con punto decimal.</div>
+</section>
+
+<h2 class="chapter-title" id="c-4">4. Reportes</h2>
+<section class="module">
+	<p class="desc">La pestaña <b>Reportes</b> concentra el resumen de gastos, ingresos y balance, la distribución por categoría y el historial de la tasa de cambio.</p>
+	<figure><img src="../capturas/03-reportes.webp" alt="Pantalla de Reportes"><figcaption>Reportes: resumen, distribución e historial.</figcaption></figure>
+
+	<h3><span class="num">4.1</span> Períodos y categorías</h3>
+	<p class="desc">Los interruptores <b>Por mes</b> y <b>Por categoría</b> cambian la vista del gráfico. La sección <b>Ingresos por categoría</b> muestra cuánto aporta cada categoría, y <b>Gastos registrados</b> el detalle del período. Si aún no hay movimientos, aparece <b>Sin datos para mostrar</b>.</p>
+	<div class="purpose-box"><strong>Para qué sirve:</strong> comparar lo que entra y sale, detectar categorías que se salen del presupuesto y seguir la evolución mes a mes.</div>
+
+	<h3><span class="num">4.2</span> Tasa del dólar</h3>
+	<p class="desc">El bloque <b>Tasa del dólar</b> muestra el valor vigente en bolívares por USD y su fecha. Si la tasa automática no es la Que quieres usar, escribe el valor en el campo y pulsa <b>Guardar tasa</b>. El botón <b>Actualizar</b> vuelve a consultar la API.</p>
+	<div class="tip-box"><strong>Nota:</strong> la corrección manual no altera la tasa histórica de DolarAPI; solo guarda el valor que decides usar. Si un día no hay tasa, la app reutiliza la última disponible.</div>
+	<figure><img src="../capturas/04-reportes-historial.webp" alt="Reportes desplazados al historial"><figcaption>Reportes desplazados: detalle por categoría e historial de tasas.</figcaption></figure>
+</section>
+
+<h2 class="chapter-title" id="c-5">5. Categorías y presupuestos</h2>
+<section class="module">
+	<p class="desc">La pestaña <b>Categorías</b> administra las categorías de gasto y de ingreso, y define límites mensuales por categoría.</p>
+	<figure><img src="../capturas/05-categorias.webp" alt="Pantalla de Categorías"><figcaption>Categorías y presupuestos mensuales (vista desplazada).</figcaption></figure>
+
+	<h3><span class="num">5.1</span> Crear categorías</h3>
+	<p class="desc">Usa <b>Crear categoría</b> para gastos o <b>Crear categoría de ingreso</b> para ingresos. Indica el <b>Nombre</b> y un <b>Color</b> (por ejemplo <code>#2dd4a7</code>) para identificarla en gráficos y listas.</p>
+	<table class="fields">
+		<thead><tr><th>Campo</th><th>Tipo</th><th>Obligatorio</th><th>Observación</th></tr></thead>
+		<tbody>
+			<tr><td>Nombre</td><td>Texto</td><td class="req">Sí</td><td>Ej. Mascotas o Bonos.</td></tr>
+			<tr><td>Color</td><td>Color</td><td class="opt">No</td><td>Se usa en el gráfico de distribución y en las etiquetas.</td></tr>
+		</tbody>
+	</table>
+
+	<h3><span class="num">5.2</span> Presupuestos mensuales</h3>
+	<p class="desc">En <b>Presupuestos mensuales</b>, escribe el <b>Límite en USD</b> de una categoría (por ejemplo <code>100.00</code>) y pulsa <b>Guardar presupuesto</b>. La fila mostrará <b>Gastado X de Y</b>; si superas el límite, el aviso aparece en color de alerta.</p>
+	<p class="desc">Para eliminar el límite, toca <b>Quitar presupuesto</b>. Si no hay límites definidos, verás <b>Aún no hay presupuestos</b>.</p>
+	<div class="workflow-box"><strong>Flujo recomendado:</strong> crear categorías → asignarlas a los gastos → poner un límite mensual → revisar en Reportes si se está respetando.</div>
+</section>
+
+<h2 class="chapter-title" id="c-6">6. Pagos y cuotas</h2>
+<section class="module">
+	<p class="desc">La pestaña <b>Pagos</b> sirve para recordar pagos recurrentes, compromisos con fecha concreta y compras a crédito con cuotas.</p>
+	<figure><img src="../capturas/06-pagos.webp" alt="Pantalla de Pagos"><figcaption>Pagos por hacer y formulario de nuevo pago (vista desplazada).</figcaption></figure>
+
+	<h3><span class="num">6.1</span> Pagos por hacer</h3>
+	<p class="desc">Cada fila muestra el nombre, el tipo, el estado, el método, la fecha o día de vencimiento y una nota opcional. El importe aparece en USD y su equivalente en Bs. El botón <b>Pagar</b> está disponible solo mientras el pago no esté marcado como pagado.</p>
+	<p class="desc">Los pagos <b>Mensuales</b> se programan de nuevo al pagarlos; los de <b>Fecha única</b> quedan marcados como pagados. Los vencimientos próximos o pasados se resaltan. Puedes eliminar cualquier pago con el icono de cerrar.</p>
+
+	<h3><span class="num">6.2</span> Crear un pago</h3>
+	<table class="fields">
+		<thead><tr><th>Campo</th><th>Tipo</th><th>Obligatorio</th><th>Observación</th></tr></thead>
+		<tbody>
+			<tr><td>Nombre</td><td>Texto</td><td class="req">Sí</td><td>Ej. Luz.</td></tr>
+			<tr><td>Moneda</td><td>USD / Bs</td><td class="req">Sí</td><td>Define cómo se interpreta el importe escrito.</td></tr>
+			<tr><td>Tipo de registro</td><td>Pago / Gasto recurrente</td><td class="req">Sí</td><td>Se oculta al elegir Cashea.</td></tr>
+			<tr><td>Método de pago</td><td>Cashea / Transferencia / Efectivo / Otro</td><td class="req">Sí</td><td>Define qué campos aparecen después.</td></tr>
+			<tr><td>Importe</td><td>Numérico</td><td class="req">Sí</td><td>Se escribe en centavos, como en gastos.</td></tr>
+			<tr><td>Tipo de pago</td><td>Mensual / Fecha única</td><td class="req">Sí</td><td>Mensual pide un <b>día de vencimiento</b> (1–31); fecha única pide una fecha.</td></tr>
+			<tr><td>Categoría</td><td>Lista</td><td class="req">Sí</td><td>Se asigna al gasto cuando se paga.</td></tr>
+			<tr><td>Nota</td><td>Texto</td><td class="opt">No</td><td>Ej. Cuota 3/6.</td></tr>
+		</tbody>
+	</table>
+	<p class="desc">Termina con <b>Crear pago</b>. El registro aparece en la lista superior.</p>
+
+	<h3><span class="num">6.3</span> Cashea</h3>
+	<p class="desc">Al elegir <b>Cashea</b>, la app pide un <b>Pago inicial</b>, el <b>número de cuotas</b> y el <b>monto de cada cuota</b>, y calcula el <b>Total de la compra</b>. Sin intereses: la inicial se paga hoy y el resto cada 14 días.</p>
+	<div class="purpose-box"><strong>Cómo contabiliza:</strong> cada cuota se convierte en gasto solo cuando pulsas <b>Pagar</b>. La cuota se calcula con la tasa BCV vigente en su fecha, por lo que el equivalente en bolívares puede cambiar entre cuotas.</div>
+</section>
+
+<h2 class="chapter-title" id="c-7">7. Actualizar la app</h2>
+<section class="module">
+	<p class="desc">La pestaña <b>Actualizar</b> permite buscar e instalar una versión nueva desde un servidor local, con verificación del archivo antes de descargarlo.</p>
+	<figure><img src="../capturas/07-actualizar.webp" alt="Pantalla de Actualizar"><figcaption>Actualizador: URL raíz, descarga e instalación manual.</figcaption></figure>
+
+	<h3><span class="num">7.1</span> Buscar e instalar</h3>
+	<div class="workflow-diagram wf-diagram">
+		<span class="wf-step">Servir updates/ en la PC</span><span class="wf-arrow">→</span>
+		<span class="wf-step">Escribir la URL raíz</span><span class="wf-arrow">→</span>
+		<span class="wf-step">Buscar y descargar</span><span class="wf-arrow">→</span>
+		<span class="wf-step">Instalar APK descargado</span>
+	</div>
+	<ol class="checklist">
+		<li>En la PC, ejecuta <code>python3 scripts/serve-update.sh</code>. El puerto por defecto es <code>8000</code>.</li>
+		<li>En el campo <b>URL del servidor</b> escribe solo la raíz, por ejemplo <code>http://&lt;IP-del-PC&gt;:8000</code>. No añadas <code>/update.json</code> ni el nombre del APK.</li>
+		<li>Pulsa <b>Buscar y descargar</b>. La app valida que el manifiesto tenga un <code>sha256</code> de 64 hexadecimales y comprueba el archivo antes de instalar.</li>
+		<li>Cuando termine, toca <b>Instalar APK descargado</b>. La instalación nunca se lanza automáticamente.</li>
+	</ol>
+	<div class="prereq-box"><strong>Requisitos:</strong> móvil y PC en la misma Wi-Fi, puerto abierto en el firewall si hace falta, y <code>version_code</code> del manifiesto mayor que el de la versión instalada. El servidor usa HTTP, así que úsalo solo en una red de confianza.</div>
+	<div class="tip-box"><strong>Si falla la instalación:</strong> casi siempre es por cambio de firma (debug → release) o por no haber autorizado la instalación de aplicaciones desconocidas. Desinstala la versión anterior y vuelve a intentarlo.</div>
+</section>
+
+<h2 class="chapter-title" id="c-8">8. Configuración</h2>
+<section class="module">
+	<p class="desc">Toca el engranaje de la cabecera para abrir <b>Configuración</b>. Allí están el tema, las copias, la seguridad y el tamaño de texto.</p>
+	<figure><img src="../capturas/08-configuracion.webp" alt="Pantalla de Configuración"><figcaption>Configuración desplazada: copias y seguridad.</figcaption></figure>
+
+	<h3><span class="num">8.1</span> Tema y tamaño de texto</h3>
+	<p class="desc"><b>Tema</b> puede ser <b>Oscuro</b> (predeterminado) o <b>Claro</b>. El cambio aplica también a las barras del sistema y se recuerda al reiniciar. En <b>Tamaño de texto</b> elige <b>Pequeño</b>, <b>Normal</b> o <b>Grande</b>.</p>
+
+	<h3><span class="num">8.2</span> Copias de seguridad</h3>
+	<p class="desc">En <b>Copia de seguridad</b> puedes <b>Exportar y descargar</b> el JSON completo, <b>Restaurar desde un archivo .json</b>, pegar el JSON en <b>O pega el JSON de la copia</b> y usar <b>Restaurar copia pegada</b>, o generar <b>Crear copia automática ahora</b>.</p>
+	<p class="desc"><b>Copia automática</b> guarda copias al abrir la app y cada 12 horas mientras esté abierta (intervalo ajustable entre 6 y 48 h). Se conservan las 3 más recientes y no se pide permiso de almacenamiento.</p>
+	<div class="prereq-box"><strong>Atención:</strong> restaurar <b>reemplaza TODOS los datos actuales</b>. La operación es transaccional, pero conviene exportar antes. Guarda la copia fuera del teléfono si quieres protegerla de una desinstalación.</div>
+
+	<h3><span class="num">8.3</span> PIN y huella</h3>
+	<table class="fields">
+		<thead><tr><th>Acción</th><th>Cómo hacerlo</th><th>Observación</th></tr></thead>
+		<tbody>
+			<tr><td>Activar PIN</td><td>Escribe <b>Nuevo PIN</b> y <b>Repite el PIN</b> → <b>Activar PIN</b></td><td>4 dígitos, guardados como SHA-256. No hay recuperación: anótalo.</td></tr>
+			<tr><td>Quitar PIN</td><td>Escribe <b>PIN actual (para quitarlo)</b> → <b>Quitar PIN</b></td><td>Al quitarlo también se desactiva la huella.</td></tr>
+			<tr><td>Huella</td><td><b>Guardar huella</b> o <b>Quitar huella</b></td><td>Requiere PIN activo como respaldo y huella configurada en Android.</td></tr>
+			<tr><td>Bloquear</td><td><b>Bloquear ahora</b></td><td>Pide PIN o huella para volver a entrar.</td></tr>
+		</tbody>
+	</table>
+	<p class="desc">Si la huella falla o el teléfono no tiene sensor configurado, entra siempre con PIN. En la pantalla de bloqueo también aparece <b>Entrar con huella</b> cuando está activada.</p>
+</section>
+
+<h2 class="chapter-title" id="c-9">9. Datos, copias y privacidad</h2>
+<section class="module">
+	<p class="desc">Todo se guarda en el directorio privado de la app (<code>getFilesDir()</code>):</p>
+	<ul class="checklist">
+		<li><code>financevz.db</code>: base de datos, movimientos, categorías, ajustes y URL de actualizaciones.</li>
+		<li><code>evidence/</code>: imágenes adjuntas, con nombre <code>ev_&lt;timestamp&gt;.&lt;ext&gt;</code>.</li>
+		<li><code>backups/</code>: copias <code>financevz-&lt;fecha&gt;.json</code> (últimas 3).</li>
+		<li><code>updates/</code>: APK descargado y archivos temporales de la descarga.</li>
+	</ul>
+	<p class="desc">Al arrancar se borran el APK cacheado ya instalado y los descartes <code>.part</code>. En escritorio se puede cambiar la ruta con <code>FINANCEVZ_DATA_DIR</code>.</p>
+	<div class="purpose-box"><strong>Privacidad:</strong> no hay cuentas ni analítica. Los gastos y copias se guardan solo en el dispositivo. La única conexión es <a href="https://ve.dolarapi.com/v1/dolares/oficial">ve.dolarapi.com/v1/dolares/oficial</a>, sin datos personales. Política completa: <a href="https://josefestevesp.github.io/finanzasvz-privacidad/">josefestevesp.github.io/finanzasvz-privacidad</a>.</div>
+</section>
+
+<h2 class="chapter-title" id="c-10">10. Preguntas frecuentes</h2>
+<section class="module">
+	<h3>¿Por qué no aparece la tasa de hoy?</h3>
+	<p class="desc">DolarAPI publica el promedio oficial diario. Si aún no hay valor para la fecha, la app usa la última tasa anterior. Puedes corregirla en Reportes o en el propio formulario del movimiento.</p>
+	<h3>¿Por qué el importe se guarda con otro valor?</h3>
+	<p class="desc">Los campos de importe interpretan los dígitos como centavos y los formatean mientras escribes. Escribe <code>85789</code> para 857,89 USD (o el equivalente en Bs).</p>
+	<h3>¿Puedo recuperar el PIN?</h3>
+	<p class="desc">No. El PIN se guarda como SHA-256 y no se puede leer. Restaura una copia o desinstala la app solo si aceptas perder los datos locales.</p>
+	<h3>¿La app sube mis gastos a algún servidor?</h3>
+	<p class="desc">No. Solo consulta la tasa de cambio. No hay servidores propios, anuncios ni analítica.</p>
+	<h3>¿La instalación del APK dice que el archivo es dañino?</h3>
+	<p class="desc">Android/Play Protect avisa porque la instalación es externa a Play Store. Autoriza la instalación de aplicaciones desconocidas únicamente para APKs que hayas generado tú.</p>
+	<h3>¿Cambió la firma y no puedo actualizar?</h3>
+	<p class="desc">Desinstala la versión anterior, exporta antes una copia desde Configuración y vuelve a instalar. Android no permite actualizar entre firmas distintas.</p>
+</section>
+
+</body>
+</html>

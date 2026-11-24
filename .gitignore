@@ -3,3 +3,7 @@
 /updates/
 /.env
 /keystore
+/manual/*.py
+/manual/*.mjs
+/manual/node_modules/
+/manual/.cache/
