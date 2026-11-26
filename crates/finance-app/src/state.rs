@@ -539,13 +539,13 @@ impl AppState {
 
     pub fn update_rate_from_api(&mut self) {
         match platform::fetch_exchange_rate() {
-            Some(rate) => {
+            Some((rate, source)) => {
                 self.exchange_rate_cents = rate;
                 self.rate_input = input_from_cents(rate);
                 let today = Local::now().date_naive();
                 if let Ok(repo) = self.repo.lock() {
                     let _ = repo.set_setting(RATE_SETTING, &rate.to_string());
-                    let _ = repo.set_rate_for_day(today, rate, "bcv");
+                    let _ = repo.set_rate_for_day(today, rate, source);
                 }
                 self.feedback = Some(format!("Tasa actualizada: {}", format_rate(rate)));
             }
@@ -1647,8 +1647,8 @@ impl AppState {
         match self.rate_history.first() {
             Some((day, rate, source, _)) => {
                 let origin = match source.as_str() {
-                    "bcv" => "automática (BCV)",
                     "dolarapi" => "automática (DolarAPI)",
+                    "bcv" => "automática (BCV)",
                     value if value.starts_with("manual") => "manual",
                     _ => source.as_str(),
                 };
@@ -1799,6 +1799,22 @@ pub fn start_auto_backup_loop(repo: Arc<Mutex<SqliteRepository>>) {
             std::thread::sleep(StdDuration::from_secs(600));
             if let Ok(guard) = repo.lock() {
                 let _ = auto_backup(&guard, false);
+            }
+        }
+    });
+}
+
+/// Actualiza la tasa en segundo plano y la persiste; la UI la recoge en el próximo refresh.
+pub fn start_rate_refresh_loop(repo: Arc<Mutex<SqliteRepository>>) {
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(StdDuration::from_secs(30 * 60));
+            if let Some((rate, source)) = platform::fetch_exchange_rate() {
+                let today = Local::now().date_naive();
+                if let Ok(guard) = repo.lock() {
+                    let _ = guard.set_setting(RATE_SETTING, &rate.to_string());
+                    let _ = guard.set_rate_for_day(today, rate, source);
+                }
             }
         }
     });

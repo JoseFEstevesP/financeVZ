@@ -10,8 +10,14 @@ use sha2::{Digest, Sha256};
 use ureq::tls::TlsConfig;
 
 const BCV_URL: &str = "https://www.bcv.org.ve";
+const DOLARAPI_URL: &str = "https://ve.dolarapi.com/v1/dolares/oficial";
 const GITHUB_RELEASES_URL: &str =
     "https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest";
+
+#[derive(Deserialize)]
+struct DolarApiResponse {
+    promedio: Option<f64>,
+}
 
 fn parse_bcv_rate(html: &str) -> Option<i64> {
     let section = html.get(html.find("id=\"dolar\"")?..)?;
@@ -27,13 +33,21 @@ fn parse_bcv_rate(html: &str) -> Option<i64> {
     Some((value * 100.0).round() as i64)
 }
 
-pub fn fetch_exchange_rate() -> Option<i64> {
-    let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(15)))
-        // El BCV sirve una cadena de certificados incompleta; igual lo hace dolar_api.
-        .tls_config(TlsConfig::builder().disable_verification(true).build())
-        .build()
-        .new_agent();
+fn parse_dolarapi_rate(promedio: Option<f64>) -> Option<i64> {
+    let value = promedio?;
+    if !value.is_finite() || value <= 0.0 || value >= 100_000.0 {
+        return None;
+    }
+    Some((value * 100.0).round() as i64)
+}
+
+fn fetch_rate_from_dolarapi(agent: &ureq::Agent) -> Option<i64> {
+    let mut response = agent.get(DOLARAPI_URL).call().ok()?;
+    let body: DolarApiResponse = response.body_mut().read_json().ok()?;
+    parse_dolarapi_rate(body.promedio)
+}
+
+fn fetch_rate_from_bcv(agent: &ureq::Agent) -> Option<i64> {
     let mut response = agent
         .get(BCV_URL)
         .header(
@@ -44,6 +58,18 @@ pub fn fetch_exchange_rate() -> Option<i64> {
         .ok()?;
     let html = response.body_mut().read_to_string().ok()?;
     parse_bcv_rate(&html)
+}
+
+pub fn fetch_exchange_rate() -> Option<(i64, &'static str)> {
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(15)))
+        // El BCV sirve una cadena de certificados incompleta.
+        .tls_config(TlsConfig::builder().disable_verification(true).build())
+        .build()
+        .new_agent();
+    fetch_rate_from_dolarapi(&agent)
+        .map(|rate| (rate, "dolarapi"))
+        .or_else(|| fetch_rate_from_bcv(&agent).map(|rate| (rate, "bcv")))
 }
 
 #[derive(Deserialize)]
@@ -806,6 +832,15 @@ mod tests {
         assert_eq!(parse_bcv_rate("id=\"dolar\">sin valor"), None);
         assert_eq!(parse_bcv_rate("id=\"dolar\"><strong>abc</strong>"), None);
         assert_eq!(parse_bcv_rate("id=\"dolar\"><strong>0,00</strong>"), None);
+    }
+
+    #[test]
+    fn parses_dolarapi_rate() {
+        assert_eq!(parse_dolarapi_rate(Some(922.5637)), Some(92_256));
+        assert_eq!(parse_dolarapi_rate(Some(857.89)), Some(85_789));
+        assert_eq!(parse_dolarapi_rate(None), None);
+        assert_eq!(parse_dolarapi_rate(Some(0.0)), None);
+        assert_eq!(parse_dolarapi_rate(Some(f64::NAN)), None);
     }
 
     #[test]

@@ -2,6 +2,16 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.33] - 2026-11-25
+
+### Corregido
+
+- La tasa automática ahora se obtiene de DolarAPI (`promedio`, dólar oficial) con respaldo del BCV, evitando conversiones Bs→USD con valores desactualizados.
+
+### Añadido
+
+- Refresco automático de la tasa cada 30 minutos mientras la app está abierta, además de la consulta al iniciar.
+
 ## [0.1.32] - 2026-11-24
 
 ### Cambiado

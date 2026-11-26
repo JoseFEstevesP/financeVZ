@@ -124,7 +124,7 @@
 	<div class="purpose-box"><strong>Para qué sirve:</strong> llevar el control de gastos e ingresos en bolívares y dólares, programar pagos y cuotas, definir presupuestos por categoría y ver reportes, sin depender de la nube.</div>
 	<div class="areas-grid">
 		<div class="area-card"><h4>Dinero</h4><p>Se guarda en centavos como entero y la base es USD. Los bolívares son solo una vista usando la tasa del día.</p></div>
-		<div class="area-card"><h4>Tasa de cambio</h4><p>Se lee del dólar oficial publicado por el BCV en su página web y se guarda por fecha. Si no hay tasa del día, se usa la última anterior.</p></div>
+		<div class="area-card"><h4>Tasa de cambio</h4><p>Se obtiene automáticamente de DolarAPI (campo <code>promedio</code>), con respaldo del BCV, se refresca al abrir y cada 30 minutos mientras la app está abierta, y se guarda por fecha. Si no hay tasa del día, se usa la última anterior.</p></div>
 		<div class="area-card"><h4>Fechas</h4><p>En pantalla se muestran como <code>dd/mm/aaaa</code>. Internamente se guardan en formato ISO.</p></div>
 		<div class="area-card"><h4>Privacidad</h4><p>Sin anuncios ni analítica. La única conexión externa es la consulta de la tasa, sin datos personales.</p></div>
 	</div>
@@ -197,8 +197,8 @@
 	<div class="purpose-box"><strong>Para qué sirve:</strong> comparar lo que entra y sale, detectar categorías que se salen del presupuesto y seguir la evolución mes a mes.</div>
 
 	<h3><span class="num">4.2</span> Tasa del dólar</h3>
-	<p class="desc">El bloque <b>Tasa del dólar</b> muestra el valor vigente en bolívares por USD y su fecha. Si la tasa automática no es la que quieres usar, escribe el valor en el campo y pulsa <b>Guardar tasa</b>. El botón <b>Actualizar</b> vuelve a leer la tasa del sitio del BCV.</p>
-	<div class="tip-box"><strong>Nota:</strong> la corrección manual no altera la tasa histórica leída del BCV; solo guarda el valor que decides usar. Si un día no hay tasa, la app reutiliza la última disponible.</div>
+	<p class="desc">El bloque <b>Tasa del dólar</b> muestra el valor vigente en bolívares por USD y su fecha. La app la consulta automáticamente al abrir y la refresca cada 30 minutos mientras está abierta. Si la tasa automática no es la que quieres usar, escribe el valor en el campo y pulsa <b>Guardar tasa</b>. El botón <b>Actualizar</b> vuelve a consultar la tasa.</p>
+	<div class="tip-box"><strong>Nota:</strong> la corrección manual no altera la tasa histórica automática; solo guarda el valor que decides usar. Si un día no hay tasa, la app reutiliza la última disponible.</div>
 	<figure><img src="../capturas/04-reportes-historial.webp" alt="Reportes desplazados al historial"><figcaption>Reportes desplazados: detalle por categoría e historial de tasas.</figcaption></figure>
 </section>
 
@@ -250,7 +250,7 @@
 
 	<h3><span class="num">6.3</span> Cashea</h3>
 	<p class="desc">Al elegir <b>Cashea</b>, la app pide un <b>Pago inicial</b>, el <b>número de cuotas</b> y el <b>monto de cada cuota</b>, y calcula el <b>Total de la compra</b>. Sin intereses: la inicial se paga hoy y el resto cada 14 días.</p>
-	<div class="purpose-box"><strong>Cómo contabiliza:</strong> cada cuota se convierte en gasto solo cuando pulsas <b>Pagar</b>. La cuota se calcula con la tasa BCV vigente en su fecha, por lo que el equivalente en bolívares puede cambiar entre cuotas.</div>
+	<div class="purpose-box"><strong>Cómo contabiliza:</strong> cada cuota se convierte en gasto solo cuando pulsas <b>Pagar</b>. La cuota se calcula con la tasa vigente en su fecha, por lo que el equivalente en bolívares puede cambiar entre cuotas.</div>
 </section>
 
 <h2 class="chapter-title" id="c-7">7. Actualizar la app</h2>

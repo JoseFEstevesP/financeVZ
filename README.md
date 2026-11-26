@@ -16,14 +16,14 @@ App Android de finanzas personales para uso personal. La lógica de negocio est�
 - Ver reportes visuales, balances por categoría y el historial de tasas.
 - Actualizar la app desde GitHub Releases (o desde un servidor local opcional), verificando el SHA-256 obligatorio del APK.
 
-El dinero se almacena como centavos en `i64`, con USD como base. La conversión a bolívares se usa solo para mostrar; la tasa se lee del dólar oficial publicado por el BCV en `https://www.bcv.org.ve` y se guarda por día.
+El dinero se almacena como centavos en `i64`, con USD como base. La conversión a bolívares se usa solo para mostrar; la tasa se obtiene automáticamente de DolarAPI (`promedio`), con respaldo del BCV, se refresca al abrir y cada 30 minutos mientras la app está abierta, y se guarda por día.
 
 Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Política de privacidad: https://josefestevesp.github.io/finanzasvz-privacidad/
 
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.32: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.32.apk
+- APK firmado 0.1.33: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.33.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
@@ -93,7 +93,7 @@ El script **no instala** el APK: instala `updates/financevz.apk` en el dispositi
 
 ## Actualizaciones
 
-La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.32` → código `32`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
+La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.33` → código `33`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
 
 Si el campo **URL del servidor** está vacío se usa GitHub. Si algún día se guardó una URL local, bórrala y pulsa **Buscar y descargar** para volver a GitHub.
 

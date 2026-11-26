@@ -28,6 +28,8 @@ pub fn run() {
     state::auto_backup(&state.repo.lock().expect("bloquear base de datos"), false);
     let backup_repo = state.repo.clone();
     state::start_auto_backup_loop(backup_repo);
+    let rate_repo = state.repo.clone();
+    state::start_rate_refresh_loop(rate_repo);
     state.update_rate_from_api();
     let _ = APP_STATE.set(state);
     dioxus::launch(App);

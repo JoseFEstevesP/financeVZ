@@ -23,7 +23,7 @@
 
 ## Reglas de dominio que se rompen fácil
 
-- Dinero en centavos `i64`, base USD; Bs es solo presentación. Tasa diaria de DolarAPI (campo `promedio`) con corrección manual; si no hay tasa del día, se usa la última anterior.
+- Dinero en centavos `i64`, base USD; Bs es solo presentación. Tasa automática desde DolarAPI (`promedio`) con respaldo BCV y corrección manual; se consulta al arrancar y se refresca cada 30 min mientras la app está abierta. Si no hay tasa del día, se usa la última anterior.
 - Formatos: USD `en-US`, Bs `es-VE`; fechas visibles `dd/mm/aaaa`, ISO solo internamente. En el input POS los dígitos son centavos y se formatean al escribir, sin convertir dentro del campo.
 - Pagos: `due_day` 1–31 o `due_date` concreto; Cashea = inicial + cuotas; una cuota se convierte en gasto solo al pulsar «Pagar».
 - Navegación: menú inferior Reportes / Categorías / Pagos / Actualizar; Inicio se abre con el logo; una sola tuerca de ajustes en la cabecera, sin enlace duplicado ni FAB central. La sección Huella aparece siempre en Configuración, con el PIN como respaldo obligatorio.
