@@ -5,7 +5,7 @@ use crate::{
         charts::Donut,
         icon::{Icon, icon_for_category},
     },
-    state::{AppState, View, format_date, money_usd, money_ves, payment_status_text},
+    state::{AppState, View, display_ves, format_date, money_usd, money_ves, payment_status_text},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -59,7 +59,12 @@ pub fn Home(props: HomeProps) -> Element {
                 date: format_date(expense.local_date),
                 method: expense.method.label().to_owned(),
                 amount: money_usd(cents),
-                secondary: money_ves(cents, expense_rate),
+                secondary: display_ves(
+                    cents,
+                    expense_rate,
+                    expense.original_amount_cents,
+                    expense.original_currency.as_deref(),
+                ),
                 evidence: expense.evidence_path.clone(),
             }
         })
@@ -152,6 +157,12 @@ pub fn Home(props: HomeProps) -> Element {
                         onclick: move |_| app_state.write().set_view(View::Search),
                         Icon { name: "search", class: "chip-icon" }
                         span { "Buscar movimientos" }
+                    }
+                    button {
+                        class: "chip",
+                        onclick: move |_| app_state.write().set_view(View::Activity),
+                        Icon { name: "note", class: "chip-icon" }
+                        span { "Historial de actividad" }
                     }
                 }
             }

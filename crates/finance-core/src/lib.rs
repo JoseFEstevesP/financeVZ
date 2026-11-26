@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod backup;
 pub mod category;
 pub mod error;
@@ -10,6 +11,7 @@ pub mod money;
 pub mod recurring;
 pub mod report;
 
+pub use activity::{ActivityEntry, ActivityKind, BackupActivity};
 pub use backup::{
     BACKUP_FORMAT, Backup, BackupBudget, BackupCategory, BackupExpense, BackupIncome,
     BackupPayment, BackupRate, BackupSetting,

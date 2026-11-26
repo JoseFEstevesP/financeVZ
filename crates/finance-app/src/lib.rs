@@ -12,8 +12,9 @@ use finance_store::SqliteRepository;
 use components::icon::Icon;
 use state::{AppState, View};
 use views::{
-    add::Add, add_income::AddIncome, categories::Categories, home::Home, income::Incomes,
-    payments::Payments, reports::Reports, search::Search, settings::Settings, update::Update,
+    activity::Activity, add::Add, add_income::AddIncome, categories::Categories, home::Home,
+    income::Incomes, payments::Payments, reports::Reports, search::Search, settings::Settings,
+    update::Update,
 };
 
 static APP_STATE: OnceLock<AppState> = OnceLock::new();
@@ -108,6 +109,7 @@ fn App() -> Element {
         View::Payments => rsx! { Payments { state: app_state } },
         View::Update => rsx! { Update { state: app_state } },
         View::Search => rsx! { Search { state: app_state } },
+        View::Activity => rsx! { Activity { state: app_state } },
         View::Settings => rsx! { Settings { state: app_state } },
     };
 
@@ -303,6 +305,16 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   background: var(--input-bg); border-radius: .625rem; font-size: 1.125rem; }
 .expense-info { flex: 1; display: flex; flex-direction: column; }
 .expense-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+.table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--row-border);
+  border-radius: .75rem; }
+.data-table { width: 100%; min-width: 46rem; border-collapse: collapse; font-size: .8125rem; }
+.data-table th, .data-table td { padding: .5625rem .625rem; text-align: left;
+  border-bottom: 1px solid var(--row-border); white-space: nowrap; }
+.data-table th { color: var(--muted); font-weight: 600; background: var(--input-bg); }
+.data-table tr:last-child td { border-bottom: 0; }
+.data-table .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.data-table .actions { display: flex; gap: .25rem; }
+.data-table .table-note { color: var(--muted); font-size: .75rem; }
 .category-row { display: flex; align-items: center; gap: .625rem; padding: .5625rem 0;
   border-bottom: 1px solid var(--row-border); }
 .grow { flex: 1; }

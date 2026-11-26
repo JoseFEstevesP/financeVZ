@@ -157,6 +157,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         }
     }
 
@@ -194,6 +196,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         };
         let incomes = vec![
             make_income(1, 1, 100000, 5),

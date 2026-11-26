@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::activity::BackupActivity;
+
 pub const BACKUP_FORMAT: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,6 +19,8 @@ pub struct Backup {
     pub budgets: Vec<BackupBudget>,
     pub rates: Vec<BackupRate>,
     pub settings: Vec<BackupSetting>,
+    #[serde(default)]
+    pub activities: Vec<BackupActivity>,
 }
 
 impl Backup {
@@ -32,6 +36,7 @@ impl Backup {
             budgets: Vec::new(),
             rates: Vec::new(),
             settings: Vec::new(),
+            activities: Vec::new(),
         }
     }
 
@@ -71,12 +76,13 @@ impl Backup {
 
     pub fn summary(&self) -> String {
         format!(
-            "{} categorías, {} gastos, {} ingresos, {} pagos, {} tasas",
+            "{} categorías, {} gastos, {} ingresos, {} pagos, {} tasas, {} acciones",
             self.categories.len(),
             self.expenses.len(),
             self.incomes.len(),
             self.payments.len(),
-            self.rates.len()
+            self.rates.len(),
+            self.activities.len()
         )
     }
 }
@@ -115,6 +121,10 @@ pub struct BackupExpense {
     pub rate_day: Option<String>,
     #[serde(default)]
     pub method: String,
+    #[serde(default)]
+    pub original_amount_cents: Option<i64>,
+    #[serde(default)]
+    pub original_currency: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -130,6 +140,10 @@ pub struct BackupIncome {
     pub rate_day: Option<String>,
     #[serde(default)]
     pub method: String,
+    #[serde(default)]
+    pub original_amount_cents: Option<i64>,
+    #[serde(default)]
+    pub original_currency: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

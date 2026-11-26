@@ -17,6 +17,8 @@ pub struct NewIncome {
     pub rate_cents: Option<i64>,
     pub rate_day: Option<String>,
     pub method: MovementMethod,
+    pub original_amount_cents: Option<i64>,
+    pub original_currency: Option<String>,
 }
 
 impl NewIncome {
@@ -49,6 +51,8 @@ pub struct Income {
     pub rate_cents: Option<i64>,
     pub rate_day: Option<String>,
     pub method: MovementMethod,
+    pub original_amount_cents: Option<i64>,
+    pub original_currency: Option<String>,
 }
 
 impl Income {
@@ -63,6 +67,8 @@ impl Income {
             rate_cents: new.rate_cents,
             rate_day: new.rate_day,
             method: new.method,
+            original_amount_cents: new.original_amount_cents,
+            original_currency: new.original_currency,
         }
     }
 }
@@ -82,6 +88,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         }
     }
 

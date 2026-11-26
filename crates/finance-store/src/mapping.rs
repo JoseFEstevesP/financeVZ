@@ -40,6 +40,8 @@ pub fn expense_from_row(row: &Row<'_>) -> Result<Expense, Error> {
         rate_cents: row.get("rate_cents")?,
         rate_day: row.get("rate_day")?,
         method: MovementMethod::parse(&row.get::<_, String>("method")?),
+        original_amount_cents: row.get("original_amount_cents")?,
+        original_currency: row.get("original_currency")?,
     })
 }
 
@@ -62,6 +64,8 @@ pub fn income_from_row(row: &Row<'_>) -> Result<Income, Error> {
         rate_cents: row.get("rate_cents")?,
         rate_day: row.get("rate_day")?,
         method: MovementMethod::parse(&row.get::<_, String>("method")?),
+        original_amount_cents: row.get("original_amount_cents")?,
+        original_currency: row.get("original_currency")?,
     })
 }
 

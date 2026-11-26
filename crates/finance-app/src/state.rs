@@ -3,12 +3,13 @@ use std::{
     time::Duration as StdDuration,
 };
 
-use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate};
+use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate, Utc};
 use finance_core::{
-    Backup, Category, CategoryId, Currency, Expense, ExpenseId, Income, IncomeId, Money,
-    MovementMethod, NewExpense, NewIncome, NewRecurringPayment, PaymentMethod, PaymentStatus,
-    RecurringKind, RecurringPayment, RecurringPaymentId, Report, build_income_report, build_report,
-    format_cents_input, format_money, format_rate, usd_to_ves, ves_to_usd,
+    ActivityEntry, ActivityKind, Backup, Category, CategoryId, Currency, Expense, ExpenseId,
+    Income, IncomeId, Money, MovementMethod, NewExpense, NewIncome, NewRecurringPayment,
+    PaymentMethod, PaymentStatus, RecurringKind, RecurringPayment, RecurringPaymentId, Report,
+    build_income_report, build_report, format_cents_input, format_money, format_rate, usd_to_ves,
+    ves_to_usd,
 };
 use finance_store::SqliteRepository;
 use sha2::{Digest, Sha256};
@@ -49,6 +50,15 @@ fn format_timestamp(seconds: i64) -> String {
         .unwrap_or_else(|| "desconocida".to_owned())
 }
 
+pub fn format_activity_moment(moment: DateTime<Utc>) -> String {
+    let local = moment.with_timezone(&Local);
+    format!(
+        "{} {}",
+        format_date(local.date_naive()),
+        local.format("%H:%M")
+    )
+}
+
 fn local_moment_at(day: NaiveDate) -> DateTime<FixedOffset> {
     let now = Local::now();
     let offset = *now.offset();
@@ -69,6 +79,7 @@ pub enum View {
     Payments,
     Update,
     Search,
+    Activity,
     Settings,
 }
 
@@ -83,6 +94,14 @@ pub enum PendingDelete {
     Expense(ExpenseId),
     Income(IncomeId),
     Payment(RecurringPaymentId),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchKind {
+    All,
+    Expense,
+    Income,
+    Payment,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -163,6 +182,7 @@ pub struct AppState {
     pub budget_input: String,
     pub search_query: String,
     pub search_category_id: Option<CategoryId>,
+    pub search_kind: SearchKind,
     pub search_from: String,
     pub search_to: String,
     pub import_input: String,
@@ -178,6 +198,7 @@ pub struct AppState {
     pub auto_backup_hours: i64,
     pub evidence_viewer: Option<String>,
     pub rate_history: Vec<(NaiveDate, i64, String, String)>,
+    pub activity: Vec<ActivityEntry>,
     pub recurring_kind: RecurringKind,
 }
 
@@ -236,6 +257,7 @@ impl AppState {
             budget_input: String::new(),
             search_query: String::new(),
             search_category_id: None,
+            search_kind: SearchKind::All,
             search_from: String::new(),
             search_to: String::new(),
             import_input: String::new(),
@@ -251,6 +273,7 @@ impl AppState {
             auto_backup_hours: 12,
             evidence_viewer: None,
             rate_history: Vec::new(),
+            activity: Vec::new(),
             recurring_kind: RecurringKind::Payment,
         };
         if let Ok(repo) = state.repo.lock() {
@@ -285,11 +308,12 @@ impl AppState {
         state
     }
 
-    fn seed_categories(&mut self) {
+    fn seed_categories(&self) {
         let seeds = [
             ("Comida", "🍔", "#e76f51"),
             ("Transporte", "🚗", "#2a9d8f"),
             ("Hogar", "🏠", "#e9c46a"),
+            ("Familia", "👨‍👩‍👧", "#c77dff"),
             ("Ocio", "🎬", "#8e7dbe"),
             ("Salud", "💊", "#57a6a1"),
             ("Otros", "📦", "#888888"),
@@ -297,10 +321,8 @@ impl AppState {
         let Ok(repo) = self.repo.lock() else {
             return;
         };
-        if repo.categories().map(|c| c.is_empty()).unwrap_or(false) {
-            for (name, icon, color) in seeds {
-                let _ = repo.add_category(name, Some(icon), color);
-            }
+        for (name, icon, color) in seeds {
+            let _ = repo.ensure_category(name, Some(icon), color);
         }
     }
 
@@ -345,11 +367,11 @@ impl AppState {
         if let Ok(history) = repo.rate_details() {
             self.rate_history = history;
         }
+        if let Ok(activity) = repo.activities(300) {
+            self.activity = activity;
+        }
         if self.budget_category_id.is_none() {
             self.budget_category_id = self.categories.first().map(|category| category.id);
-        }
-        if self.search_category_id.is_none() {
-            self.search_category_id = self.categories.first().map(|category| category.id);
         }
         if let Ok(Some(rate)) = repo.get_setting(RATE_SETTING) {
             self.exchange_rate_cents = rate.parse().unwrap_or(0);
@@ -433,6 +455,18 @@ impl AppState {
 
     pub fn clear_toast(&mut self) {
         self.toast = None;
+    }
+
+    fn log_activity(
+        &self,
+        kind: ActivityKind,
+        entity_id: i64,
+        summary: impl Into<String>,
+        amount_cents: i64,
+    ) {
+        if let Ok(repo) = self.repo.lock() {
+            let _ = repo.insert_activity(kind, entity_id, &summary.into(), amount_cents);
+        }
     }
 
     pub fn set_update_url(&mut self, value: String) {
@@ -634,6 +668,12 @@ impl AppState {
             Some(rate) => (Some(day), Some(rate)),
             None => self.rate_for(day).unzip(),
         };
+        let (original_amount_cents, original_currency) =
+            if self.entry_currency == EntryCurrency::Ves {
+                (Some(cents), Some("VES".to_owned()))
+            } else {
+                (None, None)
+            };
         let new = NewExpense {
             amount: amount.clone(),
             category_id,
@@ -644,6 +684,8 @@ impl AppState {
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
             method: self.expense_method,
+            original_amount_cents,
+            original_currency,
         };
 
         let editing = self.editing_expense;
@@ -659,10 +701,12 @@ impl AppState {
                     expense.rate_cents = new.rate_cents;
                     expense.rate_day = new.rate_day.clone();
                     expense.method = new.method;
+                    expense.original_amount_cents = new.original_amount_cents;
+                    expense.original_currency = new.original_currency.clone();
                     self.repo
                         .lock()
                         .map_err(|_| ())
-                        .and_then(|repo| repo.update_expense(&expense).map(|_| ()).map_err(|_| ()))
+                        .and_then(|repo| repo.update_expense(&expense).map(|_| id).map_err(|_| ()))
                 }
                 None => Err(()),
             }
@@ -670,11 +714,21 @@ impl AppState {
             self.repo
                 .lock()
                 .map_err(|_| ())
-                .and_then(|repo| repo.insert_expense(&new).map(|_| ()).map_err(|_| ()))
+                .and_then(|repo| repo.insert_expense(&new).map_err(|_| ()))
         };
 
         match result {
-            Ok(_) => {
+            Ok(id) => {
+                self.log_activity(
+                    if editing.is_some() {
+                        ActivityKind::ExpenseUpdated
+                    } else {
+                        ActivityKind::ExpenseCreated
+                    },
+                    id.get(),
+                    new.note.clone().unwrap_or_else(|| "Gasto".into()),
+                    usd_cents,
+                );
                 if let Some(rate) = manual_rate
                     && let Ok(repo) = self.repo.lock()
                 {
@@ -703,11 +757,7 @@ impl AppState {
     }
 
     pub fn remove_expense(&mut self, id: ExpenseId) -> bool {
-        let evidence = self
-            .expenses
-            .iter()
-            .find(|item| item.id == id)
-            .and_then(|item| item.evidence_path.clone());
+        let expense = self.expenses.iter().find(|item| item.id == id).cloned();
         let result = self
             .repo
             .lock()
@@ -716,8 +766,16 @@ impl AppState {
         if result.is_err() {
             return false;
         }
-        if let Some(path) = evidence {
-            platform::delete_evidence(&path);
+        if let Some(expense) = expense {
+            if let Some(path) = expense.evidence_path {
+                platform::delete_evidence(&path);
+            }
+            self.log_activity(
+                ActivityKind::ExpenseDeleted,
+                id.get(),
+                expense.note.unwrap_or_else(|| "Gasto".into()),
+                expense.amount.cents(),
+            );
         }
         self.refresh();
         true
@@ -752,6 +810,7 @@ impl AppState {
         } else {
             original
         };
+        let refund_amount = expense.amount.cents();
         let new = NewIncome {
             amount: expense.amount,
             category_id,
@@ -761,14 +820,22 @@ impl AppState {
             rate_cents: expense.rate_cents,
             rate_day: expense.rate_day.clone(),
             method: expense.method,
+            original_amount_cents: expense.original_amount_cents,
+            original_currency: expense.original_currency.clone(),
         };
         let result = self
             .repo
             .lock()
             .map_err(|_| ())
-            .and_then(|repo| repo.insert_income(&new).map(|_| ()).map_err(|_| ()));
+            .and_then(|repo| repo.insert_income(&new).map_err(|_| ()));
         match result {
-            Ok(()) => {
+            Ok(_) => {
+                self.log_activity(
+                    ActivityKind::ExpenseRefunded,
+                    expense.id.get(),
+                    format!("Devolución de {detail}"),
+                    refund_amount,
+                );
                 self.refresh();
                 self.toast = Some("Devolución registrada como ingreso".into());
             }
@@ -816,6 +883,12 @@ impl AppState {
             Some(rate) => (Some(day), Some(rate)),
             None => self.rate_for(day).unzip(),
         };
+        let (original_amount_cents, original_currency) =
+            if self.income_entry_currency == EntryCurrency::Ves {
+                (Some(cents), Some("VES".to_owned()))
+            } else {
+                (None, None)
+            };
         let new = NewIncome {
             amount: amount.clone(),
             category_id,
@@ -825,6 +898,8 @@ impl AppState {
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
             method: self.income_method,
+            original_amount_cents,
+            original_currency,
         };
 
         let editing = self.editing_income;
@@ -839,10 +914,12 @@ impl AppState {
                     income.rate_cents = new.rate_cents;
                     income.rate_day = new.rate_day.clone();
                     income.method = new.method;
+                    income.original_amount_cents = new.original_amount_cents;
+                    income.original_currency = new.original_currency.clone();
                     self.repo
                         .lock()
                         .map_err(|_| ())
-                        .and_then(|repo| repo.update_income(&income).map(|_| ()).map_err(|_| ()))
+                        .and_then(|repo| repo.update_income(&income).map(|_| id).map_err(|_| ()))
                 }
                 None => Err(()),
             }
@@ -850,11 +927,21 @@ impl AppState {
             self.repo
                 .lock()
                 .map_err(|_| ())
-                .and_then(|repo| repo.insert_income(&new).map(|_| ()).map_err(|_| ()))
+                .and_then(|repo| repo.insert_income(&new).map_err(|_| ()))
         };
 
         match result {
-            Ok(_) => {
+            Ok(id) => {
+                self.log_activity(
+                    if editing.is_some() {
+                        ActivityKind::IncomeUpdated
+                    } else {
+                        ActivityKind::IncomeCreated
+                    },
+                    id.get(),
+                    new.note.clone().unwrap_or_else(|| "Ingreso".into()),
+                    usd_cents,
+                );
                 if let Some(rate) = manual_rate
                     && let Ok(repo) = self.repo.lock()
                 {
@@ -882,6 +969,7 @@ impl AppState {
     }
 
     pub fn remove_income(&mut self, id: IncomeId) -> bool {
+        let income = self.incomes.iter().find(|item| item.id == id).cloned();
         let result = self
             .repo
             .lock()
@@ -889,6 +977,14 @@ impl AppState {
             .and_then(|repo| repo.delete_income(id).map_err(|_| ()));
         if result.is_err() {
             return false;
+        }
+        if let Some(income) = income {
+            self.log_activity(
+                ActivityKind::IncomeDeleted,
+                id.get(),
+                income.note.unwrap_or_else(|| "Ingreso".into()),
+                income.amount.cents(),
+            );
         }
         self.refresh();
         true
@@ -994,6 +1090,10 @@ impl AppState {
         };
         let note = self.payment_note.trim();
         let note = (!note.is_empty()).then(|| note.to_owned());
+        let summary = match &note {
+            Some(note) => format!("{name} · {note}"),
+            None => name.clone(),
+        };
         let payment = NewRecurringPayment {
             kind: self.recurring_kind,
             name,
@@ -1010,7 +1110,8 @@ impl AppState {
             .map_err(|_| ())
             .and_then(|repo| repo.add_recurring_payment(&payment).map_err(|_| ()));
         match result {
-            Ok(_) => {
+            Ok(id) => {
+                self.log_activity(ActivityKind::PaymentCreated, id.get(), summary, usd_cents);
                 self.payment_name.clear();
                 self.payment_amount.clear();
                 self.payment_day.clear();
@@ -1066,13 +1167,30 @@ impl AppState {
                 rate_cents: Some(initial_rate),
                 rate_day: self.rate_for(today).map(|(day, _)| day.to_string()),
                 method: MovementMethod::ExternalPage,
+                original_amount_cents: (self.entry_currency == EntryCurrency::Ves)
+                    .then_some(initial),
+                original_currency: (self.entry_currency == EntryCurrency::Ves)
+                    .then(|| "VES".to_owned()),
             };
-            initial_ok = self
+            let initial_summary = new.note.clone().unwrap_or_else(|| "Gasto".into());
+            let initial_amount = new.amount.cents();
+            match self
                 .repo
                 .lock()
                 .map_err(|_| ())
                 .and_then(|repo| repo.insert_expense(&new).map_err(|_| ()))
-                .is_ok();
+            {
+                Ok(id) => {
+                    self.log_activity(
+                        ActivityKind::ExpenseCreated,
+                        id.get(),
+                        initial_summary,
+                        initial_amount,
+                    );
+                    initial_ok = true;
+                }
+                Err(()) => initial_ok = false,
+            }
         }
 
         let mut created = 0usize;
@@ -1112,7 +1230,15 @@ impl AppState {
                 .map_err(|_| ())
                 .and_then(|repo| repo.add_recurring_payment(&payment).map_err(|_| ()))
             {
-                Ok(_) => created += 1,
+                Ok(id) => {
+                    self.log_activity(
+                        ActivityKind::PaymentCreated,
+                        id.get(),
+                        payment.name.clone(),
+                        payment.amount.cents(),
+                    );
+                    created += 1;
+                }
                 Err(()) => failed += 1,
             }
         }
@@ -1158,6 +1284,7 @@ impl AppState {
                 payment.method.label()
             )
         };
+        let paid_amount = payment.amount.cents();
         let new = NewExpense {
             amount: payment.amount,
             category_id: payment.category_id,
@@ -1168,6 +1295,8 @@ impl AppState {
             rate_cents,
             rate_day: rate_day.map(|value| value.to_string()),
             method: MovementMethod::from_payment_method(payment.method),
+            original_amount_cents: None,
+            original_currency: None,
         };
         let result = self
             .repo
@@ -1176,6 +1305,12 @@ impl AppState {
             .and_then(|repo| repo.pay_recurring_payment(id, &new).map_err(|_| ()));
         match result {
             Ok(()) => {
+                self.log_activity(
+                    ActivityKind::PaymentPaid,
+                    id.get(),
+                    payment.name.clone(),
+                    paid_amount,
+                );
                 self.feedback = Some(format!("{} pagado y registrado", payment.name));
                 self.refresh();
             }
@@ -1188,6 +1323,7 @@ impl AppState {
     }
 
     pub fn remove_payment(&mut self, id: RecurringPaymentId) -> bool {
+        let payment = self.payments.iter().find(|item| item.id == id).cloned();
         let result = self
             .repo
             .lock()
@@ -1195,6 +1331,14 @@ impl AppState {
             .and_then(|repo| repo.delete_recurring_payment(id).map_err(|_| ()));
         if result.is_err() {
             return false;
+        }
+        if let Some(payment) = payment {
+            self.log_activity(
+                ActivityKind::PaymentDeleted,
+                id.get(),
+                payment.name,
+                payment.amount.cents(),
+            );
         }
         self.refresh();
         true
@@ -1225,12 +1369,25 @@ impl AppState {
         };
         self.editing_expense = Some(id);
         self.editing_income = None;
-        self.amount = format_cents_input(&expense.amount.cents().to_string(), "USD");
+        let original_ves = expense.original_currency.as_deref() == Some("VES")
+            && expense.original_amount_cents.is_some();
+        if original_ves {
+            self.amount = format_cents_input(
+                &expense
+                    .original_amount_cents
+                    .unwrap_or_default()
+                    .to_string(),
+                "VES",
+            );
+            self.entry_currency = EntryCurrency::Ves;
+        } else {
+            self.amount = format_cents_input(&expense.amount.cents().to_string(), "USD");
+            self.entry_currency = EntryCurrency::Usd;
+        }
         self.note = expense.note.clone().unwrap_or_default();
         self.expense_date = expense.local_date.to_string();
         self.category_id = Some(expense.category_id);
         self.expense_method = expense.method;
-        self.entry_currency = EntryCurrency::Usd;
         self.expense_rate_input = expense.rate_cents.map(input_from_cents).unwrap_or_default();
         self.evidence_path = expense.evidence_path.clone();
         self.evidence_name = expense
@@ -1248,12 +1405,22 @@ impl AppState {
         };
         self.editing_income = Some(id);
         self.editing_expense = None;
-        self.income_amount = format_cents_input(&income.amount.cents().to_string(), "USD");
+        let original_ves = income.original_currency.as_deref() == Some("VES")
+            && income.original_amount_cents.is_some();
+        if original_ves {
+            self.income_amount = format_cents_input(
+                &income.original_amount_cents.unwrap_or_default().to_string(),
+                "VES",
+            );
+            self.income_entry_currency = EntryCurrency::Ves;
+        } else {
+            self.income_amount = format_cents_input(&income.amount.cents().to_string(), "USD");
+            self.income_entry_currency = EntryCurrency::Usd;
+        }
         self.income_note = income.note.clone().unwrap_or_default();
         self.income_date = income.local_date.to_string();
         self.income_category_id = Some(income.category_id);
         self.income_method = income.method;
-        self.income_entry_currency = EntryCurrency::Usd;
         self.income_rate_input = income.rate_cents.map(input_from_cents).unwrap_or_default();
         self.feedback = None;
         self.view = View::AddIncome;
@@ -1410,6 +1577,51 @@ impl AppState {
             .collect()
     }
 
+    pub fn searched_payments(&self) -> Vec<RecurringPayment> {
+        let from = self.search_from.trim();
+        let to = self.search_to.trim();
+        let today = Local::now().date_naive();
+        self.payments
+            .iter()
+            .filter(|payment| {
+                let category = self
+                    .category_of(payment.category_id)
+                    .map(|item| item.name.as_str())
+                    .unwrap_or("");
+                if !self.matches_search(
+                    &format!(
+                        "{} {} {}",
+                        payment.name,
+                        payment.note.as_deref().unwrap_or(""),
+                        category
+                    ),
+                    payment.category_id,
+                ) {
+                    return false;
+                }
+                let due = payment.due_date(today.year(), today.month());
+                if !from.is_empty() {
+                    let Ok(start) = NaiveDate::parse_from_str(from, "%Y-%m-%d") else {
+                        return false;
+                    };
+                    if due < start {
+                        return false;
+                    }
+                }
+                if !to.is_empty() {
+                    let Ok(end) = NaiveDate::parse_from_str(to, "%Y-%m-%d") else {
+                        return false;
+                    };
+                    if due > end {
+                        return false;
+                    }
+                }
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
     pub fn export_backup_json(&mut self) -> Option<String> {
         let result = self
             .repo
@@ -1452,6 +1664,7 @@ impl AppState {
             });
         match result {
             Ok(()) => {
+                self.seed_categories();
                 self.refresh();
                 self.feedback = Some(format!("Copia restaurada: {}.", backup.summary()));
             }
@@ -1762,6 +1975,23 @@ pub fn money_ves(usd_cents: i64, rate_cents: i64) -> Option<String> {
         .map(|cents| format_money(cents, &Currency::new("VES").expect("VES válida")))
 }
 
+pub fn display_ves(
+    usd_cents: i64,
+    rate_cents: i64,
+    original_amount_cents: Option<i64>,
+    original_currency: Option<&str>,
+) -> Option<String> {
+    if original_currency == Some("VES")
+        && let Some(cents) = original_amount_cents
+    {
+        return Some(format_money(
+            cents,
+            &Currency::new("VES").expect("VES válida"),
+        ));
+    }
+    money_ves(usd_cents, rate_cents)
+}
+
 /// Escribe una copia automática local si han pasado las horas configuradas.
 /// Devuelve la ruta cuando se creó una copia.
 pub fn auto_backup(repo: &SqliteRepository, force: bool) -> Option<String> {
@@ -2004,5 +2234,31 @@ mod tests {
         state.remove_income(id);
         assert!(state.incomes.is_empty());
         assert_eq!(state.month_balance(), 0);
+    }
+
+    #[test]
+    fn searches_payments_and_logs_their_creation() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+        state.refresh();
+        state.payment_category_id = Some(state.categories[0].id);
+        state.payment_name = "Luz".into();
+        state.payment_amount = "1500".into();
+        state.payment_day = "5".into();
+        state.add_payment();
+
+        assert!(
+            state.feedback.as_deref().unwrap_or("").contains("creado"),
+            "feedback: {:?}",
+            state.feedback
+        );
+        assert_eq!(state.searched_payments().len(), 1);
+        state.search_query = "luz".into();
+        assert_eq!(state.searched_payments().len(), 1);
+        state.search_query = "agua".into();
+        assert!(state.searched_payments().is_empty());
+        assert!(state.activity.iter().any(
+            |entry| entry.kind == ActivityKind::PaymentCreated && entry.summary.contains("Luz")
+        ));
     }
 }

@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.34] - 2026-11-25
+
+### Corregido
+
+- Los montos ingresados en Bs ahora conservan su valor original exacto para mostrarlos y editarlos, evitando redondeos de ida/vuelta Bs→USD→Bs (ej. 20.800,00 Bs).
+
 ## [0.1.33] - 2026-11-25
 
 ### Corregido

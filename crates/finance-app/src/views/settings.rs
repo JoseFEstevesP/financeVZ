@@ -1,6 +1,9 @@
 use dioxus::prelude::*;
 
-use crate::{bridge, state::AppState};
+use crate::{
+    bridge,
+    state::{AppState, View},
+};
 
 #[derive(Props, Clone, PartialEq)]
 pub struct SettingsProps {
@@ -44,6 +47,16 @@ pub fn Settings(props: SettingsProps) -> Element {
                             "{label}"
                         }
                     }
+                }
+            }
+
+            div { class: "card",
+                h3 { "Historial" }
+                p { class: "muted", "Altas, cambios y borrados de gastos, ingresos y pagos." }
+                button {
+                    class: "secondary wide",
+                    onclick: move |_| app_state.write().set_view(View::Activity),
+                    "Ver historial de actividad"
                 }
             }
 

@@ -65,6 +65,7 @@ pub fn icon_for_category(name: &str, icon: Option<&str>) -> &'static str {
         "hogar" => Some("house"),
         "ocio" | "entretenimiento" => Some("entertainment"),
         "salud" => Some("health"),
+        "familia" | "familiares" => Some("house"),
         "sueldo" | "salario" | "trabajo" => Some("work"),
         "freelance" => Some("tech"),
         "ventas" => Some("shopping"),

@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod add;
 pub mod add_income;
 pub mod categories;

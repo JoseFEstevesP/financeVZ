@@ -10,8 +10,8 @@ mod tests {
     use super::*;
     use chrono::{DateTime, NaiveDate};
     use finance_core::{
-        Backup, Currency, Money, MovementMethod, NewExpense, NewIncome, NewRecurringPayment,
-        PaymentMethod, PaymentStatus,
+        ActivityKind, Backup, Currency, Money, MovementMethod, NewExpense, NewIncome,
+        NewRecurringPayment, PaymentMethod, PaymentStatus,
     };
 
     #[test]
@@ -37,6 +37,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         };
         let expense_id = repo.insert_expense(&new).unwrap();
 
@@ -79,6 +81,8 @@ mod tests {
             rate_cents: Some(85789),
             rate_day: Some(day.to_string()),
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         };
         let id = repo.insert_income(&new).unwrap();
         let incomes = repo.incomes_between(day, day).unwrap();
@@ -138,6 +142,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         };
         repo.pay_recurring_payment(id, &expense).unwrap();
 
@@ -184,6 +190,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         };
         repo.pay_recurring_payment(id, &expense).unwrap();
         assert_eq!(
@@ -217,6 +225,8 @@ mod tests {
             rate_cents: Some(85789),
             rate_day: Some(day21.to_string()),
             method: MovementMethod::Other,
+            original_amount_cents: None,
+            original_currency: None,
         };
         let id = repo.insert_expense(&new).unwrap();
         let saved = repo
@@ -244,6 +254,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::Cash,
+            original_amount_cents: None,
+            original_currency: None,
         })
         .unwrap();
 
@@ -275,6 +287,8 @@ mod tests {
             rate_cents: None,
             rate_day: None,
             method: MovementMethod::BankTransfer,
+            original_amount_cents: None,
+            original_currency: None,
         })
         .unwrap();
 
@@ -298,5 +312,45 @@ mod tests {
         assert_eq!(repo.categories().unwrap().len(), 1);
         assert_eq!(repo.budgets().unwrap().len(), 1);
         assert_eq!(repo.rate_details().unwrap()[0].2, "dolarapi");
+    }
+
+    #[test]
+    fn ensures_seed_category_without_duplicates() {
+        let repo = SqliteRepository::open_in_memory().unwrap();
+        repo.ensure_category("Familia", Some("familia"), "#c77dff")
+            .unwrap();
+        repo.ensure_category("Familia", Some("otro"), "#000000")
+            .unwrap();
+        let categories = repo.categories().unwrap();
+        assert_eq!(categories.len(), 1);
+        assert_eq!(categories[0].name, "Familia");
+    }
+
+    #[test]
+    fn persists_and_restores_activity_log() {
+        let repo = SqliteRepository::open_in_memory().unwrap();
+        repo.insert_activity(ActivityKind::ExpenseCreated, 7, "almuerzo", 1250)
+            .unwrap();
+        repo.insert_activity(ActivityKind::PaymentPaid, 3, "Luz", 1500)
+            .unwrap();
+
+        let entries = repo.activities(10).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].kind, ActivityKind::PaymentPaid);
+        assert_eq!(entries[0].summary, "Luz");
+        assert_eq!(entries[1].amount_cents, 1250);
+
+        let backup = repo.export_backup().unwrap();
+        assert_eq!(backup.activities.len(), 2);
+        repo.import_backup(&Backup::new("2026-11-22T00:00:00Z".into()))
+            .unwrap();
+        assert!(repo.activities(10).unwrap().is_empty());
+
+        repo.import_backup(&backup).unwrap();
+        let restored = repo.activities(10).unwrap();
+        assert_eq!(restored.len(), 2);
+        assert_eq!(restored[0].kind, ActivityKind::PaymentPaid);
+        assert_eq!(restored[0].occurred_at, entries[0].occurred_at);
+        assert_eq!(restored[1].kind, ActivityKind::ExpenseCreated);
     }
 }

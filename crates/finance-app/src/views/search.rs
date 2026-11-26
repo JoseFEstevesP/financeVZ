@@ -1,14 +1,35 @@
+use chrono::{Datelike, Local};
 use dioxus::prelude::*;
-use finance_core::CategoryId;
+use finance_core::{CategoryId, ExpenseId, IncomeId, RecurringPaymentId};
 
 use crate::{
     components::icon::{Icon, icon_for_category},
-    state::{AppState, format_date, money_usd},
+    state::{AppState, SearchKind, display_ves, format_date, money_usd, payment_status_text},
 };
 
 #[derive(Props, Clone, PartialEq)]
 pub struct SearchProps {
     pub state: Signal<AppState>,
+}
+
+enum DetailKind {
+    Expense(ExpenseId),
+    Income(IncomeId),
+    Payment(RecurringPaymentId),
+}
+
+struct DetailRow {
+    sort_key: String,
+    date: String,
+    kind: &'static str,
+    icon: &'static str,
+    name: String,
+    note: Option<String>,
+    method: String,
+    amount_cents: i64,
+    bs: Option<String>,
+    status: Option<String>,
+    entity: DetailKind,
 }
 
 #[component]
@@ -20,70 +41,153 @@ pub fn Search(props: SearchProps) -> Element {
     let to = snapshot.search_to.clone();
     let categories = snapshot.categories.clone();
     let selected = snapshot.search_category_id;
+    let kind = snapshot.search_kind;
+    let rate = snapshot.exchange_rate_cents;
+    let expense_categories = snapshot.categories.clone();
+    let income_categories = snapshot.income_categories.clone();
     let expenses = snapshot.searched_expenses();
     let incomes = snapshot.searched_incomes();
+    let payments = snapshot.searched_payments();
     let expense_total: i64 = expenses.iter().map(|item| item.amount.cents()).sum();
     let income_total: i64 = incomes.iter().map(|item| item.amount.cents()).sum();
+    let payment_total: i64 = payments.iter().map(|item| item.amount.cents()).sum();
     drop(snapshot);
 
-    let expense_rows: Vec<_> = expenses
-        .into_iter()
-        .map(|expense| {
-            let category = app_state
-                .read()
-                .category_of(expense.category_id)
+    let today = Local::now().date_naive();
+    let mut rows: Vec<DetailRow> = Vec::new();
+
+    if kind != SearchKind::Income && kind != SearchKind::Payment {
+        for expense in expenses {
+            let category = expense_categories
+                .iter()
+                .find(|item| item.id == expense.category_id);
+            let name = category
                 .map(|item| item.name.clone())
                 .unwrap_or_else(|| "Otros".into());
-            let icon = icon_for_category(
-                &category,
-                app_state
-                    .read()
-                    .category_of(expense.category_id)
-                    .and_then(|item| item.icon.as_deref()),
-            );
-            (
-                expense.id,
+            let icon = icon_for_category(&name, category.and_then(|item| item.icon.as_deref()));
+            let amount_cents = expense.amount.cents();
+            rows.push(DetailRow {
+                sort_key: expense.local_date.to_string(),
+                date: format_date(expense.local_date),
+                kind: "Gasto",
                 icon,
-                category,
-                expense.note.clone(),
-                format_date(expense.local_date),
-                expense.method.label().to_owned(),
-                money_usd(expense.amount.cents()),
-            )
-        })
-        .collect();
-    let income_rows: Vec<_> = incomes
-        .into_iter()
-        .map(|income| {
-            let category = app_state
-                .read()
-                .income_category_of(income.category_id)
+                name,
+                note: expense.note.clone(),
+                method: expense.method.label().to_owned(),
+                bs: expense
+                    .rate_cents
+                    .and_then(|row_rate| {
+                        display_ves(
+                            amount_cents,
+                            row_rate,
+                            expense.original_amount_cents,
+                            expense.original_currency.as_deref(),
+                        )
+                    })
+                    .or_else(|| {
+                        display_ves(
+                            amount_cents,
+                            rate,
+                            expense.original_amount_cents,
+                            expense.original_currency.as_deref(),
+                        )
+                    }),
+                amount_cents,
+                status: None,
+                entity: DetailKind::Expense(expense.id),
+            });
+        }
+    }
+
+    if kind != SearchKind::Expense && kind != SearchKind::Payment {
+        for income in incomes {
+            let category = income_categories
+                .iter()
+                .find(|item| item.id == income.category_id);
+            let name = category
                 .map(|item| item.name.clone())
                 .unwrap_or_else(|| "Otros".into());
-            let icon = icon_for_category(
-                &category,
-                app_state
-                    .read()
-                    .income_category_of(income.category_id)
-                    .and_then(|item| item.icon.as_deref()),
-            );
-            (
-                income.id,
+            let icon = icon_for_category(&name, category.and_then(|item| item.icon.as_deref()));
+            let amount_cents = income.amount.cents();
+            rows.push(DetailRow {
+                sort_key: income.local_date.to_string(),
+                date: format_date(income.local_date),
+                kind: "Ingreso",
                 icon,
-                category,
-                income.note.clone(),
-                format_date(income.local_date),
-                income.method.label().to_owned(),
-                money_usd(income.amount.cents()),
-            )
-        })
-        .collect();
+                name,
+                note: income.note.clone(),
+                method: income.method.label().to_owned(),
+                bs: income
+                    .rate_cents
+                    .and_then(|row_rate| {
+                        display_ves(
+                            amount_cents,
+                            row_rate,
+                            income.original_amount_cents,
+                            income.original_currency.as_deref(),
+                        )
+                    })
+                    .or_else(|| {
+                        display_ves(
+                            amount_cents,
+                            rate,
+                            income.original_amount_cents,
+                            income.original_currency.as_deref(),
+                        )
+                    }),
+                amount_cents,
+                status: None,
+                entity: DetailKind::Income(income.id),
+            });
+        }
+    }
+
+    if kind != SearchKind::Expense && kind != SearchKind::Income {
+        for payment in payments {
+            let category = expense_categories
+                .iter()
+                .find(|item| item.id == payment.category_id)
+                .map(|item| item.name.clone())
+                .unwrap_or_else(|| "Otros".into());
+            let amount_cents = payment.amount.cents();
+            let due = payment.due_date(today.year(), today.month());
+            rows.push(DetailRow {
+                sort_key: due.to_string(),
+                date: format_date(due),
+                kind: "Pago",
+                icon: "payments",
+                name: format!("{category} · {}", payment.name),
+                note: payment.note.clone(),
+                method: payment.method.label().to_owned(),
+                bs: display_ves(amount_cents, rate, None, None),
+                amount_cents,
+                status: Some(payment_status_text(payment.status(today))),
+                entity: DetailKind::Payment(payment.id),
+            });
+        }
+    }
+
+    rows.sort_by(|left, right| right.sort_key.cmp(&left.sort_key));
 
     rsx! {
         div { class: "page",
             div { class: "card",
                 h3 { "Buscar movimientos" }
-                label { class: "field-label", "Texto (nota o categoría)" }
+                div { class: "row-buttons",
+                    for (value, label) in [
+                        (SearchKind::All, "Todos"),
+                        (SearchKind::Expense, "Gastos"),
+                        (SearchKind::Income, "Ingresos"),
+                        (SearchKind::Payment, "Pagos"),
+                    ] {
+                        button {
+                            class: if kind == value { "chip active" } else { "chip" },
+                            onclick: move |_| app_state.write().search_kind = value,
+                            "{label}"
+                        }
+                    }
+                }
+                label { class: "field-label", "Texto (nota, categoría o pago)" }
                 input {
                     class: "text-input",
                     value: query,
@@ -125,76 +229,100 @@ pub fn Search(props: SearchProps) -> Element {
                 }
                 p { class: "date-hint", "Fechas en formato venezolano: dd/mm/aaaa." }
                 p { class: "muted",
-                    "Gastos: {money_usd(expense_total)} · Ingresos: {money_usd(income_total)}"
+                    "Gastos: {money_usd(expense_total)} · Ingresos: {money_usd(income_total)} · Pagos: {money_usd(payment_total)}"
                 }
             }
 
             div { class: "card",
-                h3 { "Gastos ({expense_rows.len()})" }
-                if expense_rows.is_empty() {
-                    p { class: "muted", "Sin resultados." }
-                } else {
-                    for (id, icon, category, note, date, method, amount) in expense_rows {
-                        div { class: "expense-row",
-                            div { class: "expense-icon", Icon { name: icon, class: "row-icon" } }
-                            div { class: "expense-info",
-                                strong { "{category}" }
-                                if let Some(note) = note {
-                                    small { class: "muted", "{note}" }
-                                }
-                                small { class: "muted", "{date} · {method}" }
-                            }
-                            span { class: "expense-amount", "{amount}" }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Devolver gasto",
-                                onclick: move |_| app_state.write().refund_expense(id),
-                                Icon { name: "income", class: "icon" }
-                            }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Editar gasto",
-                                onclick: move |_| app_state.write().begin_edit_expense(id),
-                                Icon { name: "edit", class: "icon" }
-                            }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Eliminar gasto",
-                                onclick: move |_| app_state.write().request_remove_expense(id),
-                                Icon { name: "delete", class: "icon" }
+                h3 { "Detalle ({rows.len()})" }
+                div { class: "table-scroll",
+                    table { class: "data-table",
+                        thead {
+                            tr {
+                                th { "Fecha" }
+                                th { "Tipo" }
+                                th { "Categoría / Nombre" }
+                                th { "Nota" }
+                                th { "Método" }
+                                th { class: "num", "USD" }
+                                th { class: "num", "Bs" }
+                                th { "Estado" }
+                                th { "Acciones" }
                             }
                         }
-                    }
-                }
-            }
-
-            div { class: "card",
-                h3 { "Ingresos ({income_rows.len()})" }
-                if income_rows.is_empty() {
-                    p { class: "muted", "Sin resultados." }
-                } else {
-                    for (id, icon, category, note, date, method, amount) in income_rows {
-                        div { class: "expense-row",
-                            div { class: "expense-icon", Icon { name: icon, class: "row-icon" } }
-                            div { class: "expense-info",
-                                strong { "{category}" }
-                                if let Some(note) = note {
-                                    small { class: "muted", "{note}" }
+                        tbody {
+                            if rows.is_empty() {
+                                tr {
+                                    td { class: "muted", colspan: "9", "Sin resultados." }
                                 }
-                                small { class: "muted", "{date} · {method}" }
                             }
-                            span { class: "expense-amount", "{amount}" }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Editar ingreso",
-                                onclick: move |_| app_state.write().begin_edit_income(id),
-                                Icon { name: "edit", class: "icon" }
-                            }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Eliminar ingreso",
-                                onclick: move |_| app_state.write().request_remove_income(id),
-                                Icon { name: "delete", class: "icon" }
+                            for row in rows {
+                                tr {
+                                    td { "{row.date}" }
+                                    td { "{row.kind}" }
+                                    td {
+                                        div { style: "display:flex; align-items:center; gap:.5rem;",
+                                            Icon { name: row.icon, class: "icon" }
+                                            strong { "{row.name}" }
+                                        }
+                                    }
+                                    td { class: "table-note",
+                                        if let Some(note) = row.note { "{note}" }
+                                    }
+                                    td { "{row.method}" }
+                                    td { class: "num", "{money_usd(row.amount_cents)}" }
+                                    td { class: "num",
+                                        if let Some(bs) = row.bs { "{bs}" }
+                                    }
+                                    td {
+                                        if let Some(status) = row.status { "{status}" }
+                                    }
+                                    td { class: "actions",
+                                        match row.entity {
+                                            DetailKind::Expense(id) => rsx! {
+                                                button {
+                                                    class: "icon-button",
+                                                    aria_label: "Devolver gasto",
+                                                    onclick: move |_| app_state.write().refund_expense(id),
+                                                    Icon { name: "income", class: "icon" }
+                                                }
+                                                button {
+                                                    class: "icon-button",
+                                                    aria_label: "Editar gasto",
+                                                    onclick: move |_| app_state.write().begin_edit_expense(id),
+                                                    Icon { name: "edit", class: "icon" }
+                                                }
+                                                button {
+                                                    class: "icon-button",
+                                                    aria_label: "Eliminar gasto",
+                                                    onclick: move |_| app_state.write().request_remove_expense(id),
+                                                    Icon { name: "delete", class: "icon" }
+                                                }
+                                            },
+                                            DetailKind::Income(id) => rsx! {
+                                                button {
+                                                    class: "icon-button",
+                                                    aria_label: "Editar ingreso",
+                                                    onclick: move |_| app_state.write().begin_edit_income(id),
+                                                    Icon { name: "edit", class: "icon" }
+                                                }
+                                                button {
+                                                    class: "icon-button",
+                                                    aria_label: "Eliminar ingreso",
+                                                    onclick: move |_| app_state.write().request_remove_income(id),
+                                                    Icon { name: "delete", class: "icon" }
+                                                }
+                                            },
+                                            DetailKind::Payment(id) => rsx! {
+                                                button {
+                                                    class: "chip",
+                                                    onclick: move |_| app_state.write().pay_payment(id),
+                                                    "Pagar"
+                                                }
+                                            },
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

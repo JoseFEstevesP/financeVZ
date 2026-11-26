@@ -1,11 +1,12 @@
 use std::path::Path;
 
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use finance_core::{
-    Backup, BackupBudget, BackupCategory, BackupExpense, BackupIncome, BackupPayment, BackupRate,
-    BackupSetting, Category, CategoryId, Expense, ExpenseId, Income, IncomeId, NewExpense,
-    NewIncome, NewRecurringPayment, RecurringPayment, RecurringPaymentId, Report,
-    build_income_report, build_report, category::validate_name,
+    ActivityEntry, ActivityKind, Backup, BackupActivity, BackupBudget, BackupCategory,
+    BackupExpense, BackupIncome, BackupPayment, BackupRate, BackupSetting, Category, CategoryId,
+    Expense, ExpenseId, Income, IncomeId, NewExpense, NewIncome, NewRecurringPayment,
+    RecurringPayment, RecurringPaymentId, Report, build_income_report, build_report,
+    category::validate_name,
 };
 use rusqlite::{Connection, params};
 use rusqlite_migration::{M, Migrations};
@@ -22,6 +23,8 @@ const MIGRATIONS: &[M<'_>] = &[
         "../migrations/0006_budget_and_recurring_kind.sql"
     )),
     M::up(include_str!("../migrations/0007_movement_method.sql")),
+    M::up(include_str!("../migrations/0008_activity_log.sql")),
+    M::up(include_str!("../migrations/0009_original_amount.sql")),
 ];
 
 pub struct SqliteRepository {
@@ -59,6 +62,21 @@ impl SqliteRepository {
         Ok(CategoryId::new(self.conn.last_insert_rowid()))
     }
 
+    pub fn ensure_category(
+        &self,
+        name: &str,
+        icon: Option<&str>,
+        color: &str,
+    ) -> Result<(), StoreError> {
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "INSERT OR IGNORE INTO categories (name, icon, color, created_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![name.trim(), icon, color, now],
+        )?;
+        Ok(())
+    }
+
     pub fn categories(&self) -> Result<Vec<Category>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, icon, color, is_active, sort_order
@@ -80,7 +98,7 @@ impl SqliteRepository {
     ) -> Result<Vec<Expense>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, spent_at, local_date,
-                    evidence_path, rate_cents, rate_day, method
+                    evidence_path, rate_cents, rate_day, method, original_amount_cents, original_currency
              FROM expenses WHERE local_date BETWEEN ?1 AND ?2
              ORDER BY local_date DESC, id DESC",
         )?;
@@ -130,8 +148,9 @@ impl SqliteRepository {
         self.conn.execute(
             "INSERT INTO incomes
              (amount_cents, currency, category_id, note, received_at, local_date,
-              rate_cents, rate_day, method, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+              rate_cents, rate_day, method, created_at, updated_at,
+              original_amount_cents, original_currency)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 new.amount.cents(),
                 new.amount.currency().as_str(),
@@ -144,6 +163,8 @@ impl SqliteRepository {
                 new.method.as_str(),
                 now,
                 now,
+                new.original_amount_cents,
+                new.original_currency,
             ],
         )?;
         Ok(IncomeId::new(self.conn.last_insert_rowid()))
@@ -156,7 +177,7 @@ impl SqliteRepository {
     ) -> Result<Vec<Income>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, received_at, local_date,
-                    rate_cents, rate_day, method
+                    rate_cents, rate_day, method, original_amount_cents, original_currency
              FROM incomes WHERE local_date BETWEEN ?1 AND ?2
              ORDER BY local_date DESC, id DESC",
         )?;
@@ -180,7 +201,8 @@ impl SqliteRepository {
         let updated = self.conn.execute(
             "UPDATE expenses SET amount_cents = ?2, currency = ?3, category_id = ?4,
                     note = ?5, spent_at = ?6, local_date = ?7, evidence_path = ?8,
-                    rate_cents = ?9, rate_day = ?10, method = ?11, updated_at = ?12
+                    rate_cents = ?9, rate_day = ?10, method = ?11, updated_at = ?12,
+                    original_amount_cents = ?13, original_currency = ?14
              WHERE id = ?1",
             params![
                 expense.id.get(),
@@ -195,6 +217,8 @@ impl SqliteRepository {
                 expense.rate_day,
                 expense.method.as_str(),
                 now,
+                expense.original_amount_cents,
+                expense.original_currency,
             ],
         )?;
         Ok(updated > 0)
@@ -205,7 +229,8 @@ impl SqliteRepository {
         let updated = self.conn.execute(
             "UPDATE incomes SET amount_cents = ?2, currency = ?3, category_id = ?4,
                     note = ?5, received_at = ?6, local_date = ?7,
-                    rate_cents = ?8, rate_day = ?9, method = ?10, updated_at = ?11
+                    rate_cents = ?8, rate_day = ?9, method = ?10, updated_at = ?11,
+                    original_amount_cents = ?12, original_currency = ?13
              WHERE id = ?1",
             params![
                 income.id.get(),
@@ -219,6 +244,8 @@ impl SqliteRepository {
                 income.rate_day,
                 income.method.as_str(),
                 now,
+                income.original_amount_cents,
+                income.original_currency,
             ],
         )?;
         Ok(updated > 0)
@@ -270,6 +297,57 @@ impl SqliteRepository {
             .map_err(StoreError::from)
     }
 
+    pub fn insert_activity(
+        &self,
+        kind: ActivityKind,
+        entity_id: i64,
+        summary: &str,
+        amount_cents: i64,
+    ) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT INTO activity_log (kind, entity_id, summary, amount_cents, occurred_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                kind.as_str(),
+                entity_id,
+                summary,
+                amount_cents,
+                Utc::now().to_rfc3339()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn activities(&self, limit: i64) -> Result<Vec<ActivityEntry>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, kind, entity_id, summary, amount_cents, occurred_at
+             FROM activity_log ORDER BY occurred_at DESC, id DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(params![limit], |row| {
+            let kind: String = row.get(1)?;
+            let occurred_at: String = row.get(5)?;
+            let occurred_at = DateTime::parse_from_rfc3339(&occurred_at)
+                .map(|moment| moment.with_timezone(&Utc))
+                .map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        5,
+                        rusqlite::types::Type::Text,
+                        Box::new(error),
+                    )
+                })?;
+            Ok(ActivityEntry {
+                id: row.get(0)?,
+                kind: ActivityKind::parse(&kind),
+                entity_id: row.get(2)?,
+                summary: row.get(3)?,
+                amount_cents: row.get(4)?,
+                occurred_at,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(StoreError::from)
+    }
+
     pub fn export_backup(&self) -> Result<Backup, StoreError> {
         let mut backup = Backup::new(Utc::now().to_rfc3339());
 
@@ -305,7 +383,8 @@ impl SqliteRepository {
 
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, spent_at, local_date,
-                    evidence_path, rate_cents, rate_day, method FROM expenses ORDER BY id",
+                    evidence_path, rate_cents, rate_day, method, original_amount_cents, original_currency
+             FROM expenses ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(BackupExpense {
@@ -320,13 +399,16 @@ impl SqliteRepository {
                 rate_cents: row.get(8)?,
                 rate_day: row.get(9)?,
                 method: row.get(10)?,
+                original_amount_cents: row.get(11)?,
+                original_currency: row.get(12)?,
             })
         })?;
         backup.expenses = rows.collect::<Result<Vec<_>, _>>()?;
 
         let mut stmt = self.conn.prepare(
             "SELECT id, amount_cents, currency, category_id, note, received_at, local_date,
-                    rate_cents, rate_day, method FROM incomes ORDER BY id",
+                    rate_cents, rate_day, method, original_amount_cents, original_currency
+             FROM incomes ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(BackupIncome {
@@ -340,6 +422,8 @@ impl SqliteRepository {
                 rate_cents: row.get(7)?,
                 rate_day: row.get(8)?,
                 method: row.get(9)?,
+                original_amount_cents: row.get(10)?,
+                original_currency: row.get(11)?,
             })
         })?;
         backup.incomes = rows.collect::<Result<Vec<_>, _>>()?;
@@ -401,6 +485,22 @@ impl SqliteRepository {
         })?;
         backup.settings = rows.collect::<Result<Vec<_>, _>>()?;
 
+        let mut stmt = self.conn.prepare(
+            "SELECT id, kind, entity_id, summary, amount_cents, occurred_at
+             FROM activity_log ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(BackupActivity {
+                id: row.get(0)?,
+                kind: row.get(1)?,
+                entity_id: row.get(2)?,
+                summary: row.get(3)?,
+                amount_cents: row.get(4)?,
+                occurred_at: row.get(5)?,
+            })
+        })?;
+        backup.activities = rows.collect::<Result<Vec<_>, _>>()?;
+
         Ok(backup)
     }
 
@@ -418,6 +518,7 @@ impl SqliteRepository {
             "settings",
             "categories",
             "income_categories",
+            "activity_log",
         ] {
             tx.execute(&format!("DELETE FROM {table}"), [])?;
         }
@@ -455,8 +556,9 @@ impl SqliteRepository {
         for expense in &backup.expenses {
             tx.execute(
                 "INSERT INTO expenses (id, amount_cents, currency, category_id, note, spent_at,
-                        local_date, evidence_path, rate_cents, rate_day, method, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                        local_date, evidence_path, rate_cents, rate_day, method, created_at, updated_at,
+                        original_amount_cents, original_currency)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                 params![
                     expense.id,
                     expense.amount_cents,
@@ -471,14 +573,17 @@ impl SqliteRepository {
                     expense.method,
                     backup.exported_at,
                     backup.exported_at,
+                    expense.original_amount_cents,
+                    expense.original_currency,
                 ],
             )?;
         }
         for income in &backup.incomes {
             tx.execute(
                 "INSERT INTO incomes (id, amount_cents, currency, category_id, note, received_at,
-                        local_date, rate_cents, rate_day, method, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                        local_date, rate_cents, rate_day, method, created_at, updated_at,
+                        original_amount_cents, original_currency)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 params![
                     income.id,
                     income.amount_cents,
@@ -492,6 +597,8 @@ impl SqliteRepository {
                     income.method,
                     backup.exported_at,
                     backup.exported_at,
+                    income.original_amount_cents,
+                    income.original_currency,
                 ],
             )?;
         }
@@ -536,6 +643,21 @@ impl SqliteRepository {
             tx.execute(
                 "INSERT INTO settings (key, value) VALUES (?1, ?2)",
                 params![setting.key, setting.value],
+            )?;
+        }
+        for activity in &backup.activities {
+            tx.execute(
+                "INSERT INTO activity_log
+                    (id, kind, entity_id, summary, amount_cents, occurred_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    activity.id,
+                    activity.kind,
+                    activity.entity_id,
+                    activity.summary,
+                    activity.amount_cents,
+                    activity.occurred_at,
+                ],
             )?;
         }
         tx.commit()?;
@@ -713,8 +835,9 @@ fn insert_expense_on(conn: &Connection, new: &NewExpense) -> Result<ExpenseId, S
     conn.execute(
         "INSERT INTO expenses
          (amount_cents, currency, category_id, note, spent_at, local_date,
-          evidence_path, rate_cents, rate_day, method, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+          evidence_path, rate_cents, rate_day, method, created_at, updated_at,
+          original_amount_cents, original_currency)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             new.amount.cents(),
             new.amount.currency().as_str(),
@@ -728,6 +851,8 @@ fn insert_expense_on(conn: &Connection, new: &NewExpense) -> Result<ExpenseId, S
             new.method.as_str(),
             now,
             now,
+            new.original_amount_cents,
+            new.original_currency,
         ],
     )?;
     Ok(ExpenseId::new(conn.last_insert_rowid()))

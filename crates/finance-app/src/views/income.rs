@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::icon::{Icon, icon_for_category},
-    state::{AppState, View, format_date, money_usd, money_ves},
+    state::{AppState, View, display_ves, format_date, money_usd, money_ves},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -43,7 +43,12 @@ pub fn Incomes(props: IncomeProps) -> Element {
                 format_date(income.local_date),
                 income.method.label().to_owned(),
                 money_usd(cents),
-                money_ves(cents, income_rate),
+                display_ves(
+                    cents,
+                    income_rate,
+                    income.original_amount_cents,
+                    income.original_currency.as_deref(),
+                ),
             )
         })
         .collect();
