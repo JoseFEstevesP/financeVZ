@@ -1901,6 +1901,60 @@ impl AppState {
             .sum()
     }
 
+    pub fn month_total_ves(&self, rate_cents: i64) -> Option<String> {
+        let now = Local::now();
+        let (year, month) = (now.year(), now.month());
+        let mut original_sum: i64 = 0;
+        let mut any = false;
+        for expense in self.expenses.iter().filter(|expense| {
+            expense.local_date.year() == year && expense.local_date.month() == month
+        }) {
+            any = true;
+            match (
+                expense.original_currency.as_deref(),
+                expense.original_amount_cents,
+            ) {
+                (Some("VES"), Some(cents)) => original_sum += cents,
+                _ => return money_ves(self.month_total(), rate_cents),
+            }
+        }
+        if !any {
+            return money_ves(0, rate_cents);
+        }
+        Some(format_money(
+            original_sum,
+            &Currency::new("VES").expect("VES válida"),
+        ))
+    }
+
+    pub fn month_income_total_ves(&self, rate_cents: i64) -> Option<String> {
+        let now = Local::now();
+        let (year, month) = (now.year(), now.month());
+        let mut original_sum: i64 = 0;
+        let mut any = false;
+        for income in self
+            .incomes
+            .iter()
+            .filter(|income| income.local_date.year() == year && income.local_date.month() == month)
+        {
+            any = true;
+            match (
+                income.original_currency.as_deref(),
+                income.original_amount_cents,
+            ) {
+                (Some("VES"), Some(cents)) => original_sum += cents,
+                _ => return money_ves(self.month_income_total(), rate_cents),
+            }
+        }
+        if !any {
+            return money_ves(0, rate_cents);
+        }
+        Some(format_money(
+            original_sum,
+            &Currency::new("VES").expect("VES válida"),
+        ))
+    }
+
     pub fn month_balance(&self) -> i64 {
         self.month_income_total() - self.month_total()
     }

@@ -23,7 +23,7 @@ Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Polí
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.34: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.34.apk
+- APK firmado 0.1.35: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.35.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
@@ -93,7 +93,7 @@ El script **no instala** el APK: instala `updates/financevz.apk` en el dispositi
 
 ## Actualizaciones
 
-La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.34` → código `34`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
+La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.35` → código `35`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
 
 Si el campo **URL del servidor** está vacío se usa GitHub. Si algún día se guardó una URL local, bórrala y pulsa **Buscar y descargar** para volver a GitHub.
 

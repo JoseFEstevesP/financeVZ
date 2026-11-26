@@ -82,6 +82,9 @@ pub fn Home(props: HomeProps) -> Element {
     } else {
         "balance-negative"
     };
+    let month_total_ves = state
+        .month_total_ves(rate)
+        .or_else(|| money_ves(month_total, rate));
     let rate_label = state.latest_rate_label();
     drop(state);
 
@@ -107,7 +110,7 @@ pub fn Home(props: HomeProps) -> Element {
             div { class: "hero",
                 span { class: "muted", "Gastos de este mes" }
                 h2 { class: "amount", "{money_usd(month_total)}" }
-                if let Some(ves) = money_ves(month_total, rate) {
+                if let Some(ves) = month_total_ves.clone() {
                     p { class: "secondary-amount", "{ves}" }
                 }
                 div { class: "row-buttons",

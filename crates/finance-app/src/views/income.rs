@@ -19,6 +19,9 @@ pub fn Incomes(props: IncomeProps) -> Element {
     let expense_total = state.month_total();
     let balance = state.month_balance();
     let recent = state.income_recent(30);
+    let month_income_total_ves = state
+        .month_income_total_ves(rate)
+        .or_else(|| money_ves(income_total, rate));
     let rows: Vec<_> = recent
         .iter()
         .map(|income| {
@@ -65,7 +68,7 @@ pub fn Incomes(props: IncomeProps) -> Element {
             div { class: "hero compact",
                 span { class: "muted", "Ingresos de este mes" }
                 h2 { class: "amount", "{money_usd(income_total)}" }
-                if let Some(ves) = money_ves(income_total, rate) {
+                if let Some(ves) = month_income_total_ves.clone() {
                     p { class: "secondary-amount", "{ves}" }
                 }
                 div { class: "summary-grid",

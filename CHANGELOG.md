@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.35] - 2026-11-25
+
+### Corregido
+
+- El total mensual en Bs (Inicio/Ingresos) suma los montos originales ingresados en Bs cuando aplica, evitando mostrar redondeos como 20.803,73 en lugar de 20.800,00.
+
 ## [0.1.34] - 2026-11-25
 
 ### Corregido
