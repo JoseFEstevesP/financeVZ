@@ -1127,10 +1127,23 @@ impl AppState {
     }
 
     pub fn add_cashea_payment(&mut self, name: String, category_id: CategoryId) {
-        let Some(initial) = parse_cents(&self.cashea_initial) else {
-            self.feedback = Some("Escribe el pago inicial".into());
+        let initial_digits: String = self
+            .cashea_initial
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .collect();
+        let Some(initial) = (if initial_digits.is_empty() {
+            None
+        } else {
+            initial_digits.parse::<i64>().ok()
+        }) else {
+            self.feedback = Some("Escribe el pago inicial (puede ser 0)".into());
             return;
         };
+        if initial < 0 {
+            self.feedback = Some("El pago inicial no puede ser negativo".into());
+            return;
+        }
         let Ok(count) = self.cashea_installments.trim().parse::<u8>() else {
             self.feedback = Some("Escribe cuántas cuotas (1-12)".into());
             return;
@@ -1143,6 +1156,10 @@ impl AppState {
             self.feedback = Some("Escribe el monto de cada cuota".into());
             return;
         };
+        if initial == 0 && installment == 0 {
+            self.feedback = Some("El total de la compra debe ser mayor a 0".into());
+            return;
+        }
         let today = Local::now().date_naive();
         let Some((_, initial_rate)) = self.rate_for(today) else {
             self.feedback = Some("Configura la tasa del dólar para convertir bolívares".into());
@@ -1153,8 +1170,9 @@ impl AppState {
         };
         let detail = self.payment_note.trim();
 
-        let mut initial_ok = false;
-        if let Some(usd) = self.convert_amount(initial, initial_rate)
+        let mut initial_ok = true;
+        if initial > 0
+            && let Some(usd) = self.convert_amount(initial, initial_rate)
             && let Ok(amount) = Money::new(usd, currency.clone())
         {
             let new = NewExpense {
@@ -1187,10 +1205,11 @@ impl AppState {
                         initial_summary,
                         initial_amount,
                     );
-                    initial_ok = true;
                 }
                 Err(()) => initial_ok = false,
             }
+        } else if initial > 0 {
+            initial_ok = false;
         }
 
         let mut created = 0usize;
@@ -1249,7 +1268,11 @@ impl AppState {
         self.payment_note.clear();
         self.payment_amount.clear();
         self.feedback = Some(if failed == 0 && initial_ok {
-            format!("Cashea: inicial + {created} cuotas creadas cada 14 días")
+            if initial == 0 {
+                format!("Cashea: {created} cuotas creadas cada 14 días (sin inicial)")
+            } else {
+                format!("Cashea: inicial + {created} cuotas creadas cada 14 días")
+            }
         } else {
             format!("Cashea: {created} cuotas creadas, {failed} fallidas")
         });
@@ -2266,6 +2289,38 @@ mod tests {
         assert_eq!(dates[0], today + Duration::days(14));
         assert_eq!(dates[1], today + Duration::days(28));
         assert_eq!(dates[2], today + Duration::days(42));
+    }
+
+    #[test]
+    fn cashea_allows_zero_initial() {
+        let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");
+        let mut state = AppState::new(repo);
+        let today = Local::now().date_naive();
+        state
+            .repo
+            .lock()
+            .unwrap()
+            .set_rate_for_day(today, 10000, "test")
+            .unwrap();
+        state.refresh();
+        let category = state.categories[0].id;
+        state.cashea_initial = "0".into();
+        state.cashea_installments = "2".into();
+        state.cashea_installment = "5000".into();
+        state.add_cashea_payment("Teléfono".into(), category);
+
+        assert!(
+            state
+                .feedback
+                .as_deref()
+                .unwrap_or("")
+                .contains("sin inicial"),
+            "{:?}",
+            state.feedback
+        );
+        let repo = state.repo.lock().unwrap();
+        assert_eq!(repo.expenses_between(today, today).unwrap().len(), 0);
+        assert_eq!(repo.recurring_payments().unwrap().len(), 2);
     }
 
     #[test]

@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.37] - 2026-11-26
+
+### Corregido
+
+- Cashea permite registrar compras con **inicial 0%/0**: no se crea gasto de inicial cuando es 0 y se generan solo las cuotas cada 14 días.
+
 ## [0.1.36] - 2026-11-25
 
 ### Añadido

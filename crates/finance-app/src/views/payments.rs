@@ -284,7 +284,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                         class: "amount-input",
                         value: format_cents_input(&cashea_initial, entry_currency.code()),
                         inputmode: "numeric",
-                        placeholder: "0.00",
+                        placeholder: "0.00 (puede ser 0)",
                         oninput: move |event| {
                             let digits: String = event.value().chars().filter(|c| c.is_ascii_digit()).collect();
                             let mut state = state.write();
