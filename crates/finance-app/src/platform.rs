@@ -72,16 +72,16 @@ pub fn fetch_exchange_rate() -> Option<(i64, &'static str)> {
         .or_else(|| fetch_rate_from_bcv(&agent).map(|rate| (rate, "bcv")))
 }
 
-#[derive(Deserialize)]
-struct UpdateInfo {
+#[derive(Deserialize, Clone)]
+pub struct UpdateInfo {
     #[serde(default, alias = "versionCode")]
-    version_code: i64,
+    pub version_code: i64,
     #[serde(default, alias = "versionName")]
-    version_name: String,
+    pub version_name: String,
     #[serde(default = "default_apk_name", alias = "url")]
-    apk: String,
+    pub apk: String,
     #[serde(default)]
-    sha256: Option<String>,
+    pub sha256: Option<String>,
 }
 
 fn default_apk_name() -> String {
@@ -110,9 +110,9 @@ struct GitHubAsset {
     browser_download_url: String,
 }
 
-struct ResolvedUpdate {
-    info: UpdateInfo,
-    apk_url: String,
+pub struct ResolvedUpdate {
+    pub info: UpdateInfo,
+    pub apk_url: String,
 }
 
 pub fn checksum_of(bytes: &[u8]) -> String {
@@ -533,7 +533,7 @@ fn fetch_github_release() -> Result<ResolvedUpdate, String> {
     github_release_from_json(&body)
 }
 
-fn resolve_update(source: &UpdateSource) -> Result<ResolvedUpdate, String> {
+pub fn resolve_update(source: &UpdateSource) -> Result<ResolvedUpdate, String> {
     match source {
         UpdateSource::GitHub => fetch_github_release(),
         UpdateSource::Local(base_url) => {

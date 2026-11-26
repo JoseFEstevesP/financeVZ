@@ -1,8 +1,16 @@
 package dev.dioxus.main
 
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.biometric.BiometricManager
@@ -10,6 +18,9 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
+import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
 
 typealias BuildConfig = com.gato99.financevz.BuildConfig
 
@@ -20,6 +31,37 @@ class MainActivity : WryActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyTheme(prefs.getBoolean("light_theme", false))
+        restorePendingDownload()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        checkPendingDownload()
+    }
+
+    private fun restorePendingDownload() {
+        pendingDownloadId = prefs.getLong("pending_download_id", -1L)
+        pendingSha256 = prefs.getString("pending_download_sha", "") ?: ""
+        pendingVersionCode = prefs.getLong("pending_download_version", 0L)
+        if (pendingDownloadId != -1L) {
+            registerDownloadReceiver()
+            checkPendingDownload()
+        }
+    }
+
+    private fun checkPendingDownload() {
+        val id = pendingDownloadId
+        if (id == -1L) return
+        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val cursor = dm.query(DownloadManager.Query().setFilterById(id))
+        cursor.use {
+            if (!it.moveToFirst()) return
+            val statusIdx = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            val status = if (statusIdx >= 0) it.getInt(statusIdx) else return
+            if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
+                handleDownloadComplete(id)
+            }
+        }
     }
 
     override fun onWebViewCreate(view: WebView) {
@@ -53,6 +95,157 @@ class MainActivity : WryActivity() {
             prefs.edit().putBoolean("light_theme", light).apply()
             runOnUiThread { applyTheme(light) }
         }
+
+        @JavascriptInterface
+        fun downloadUpdate(url: String, sha256: String, versionCode: Long, versionName: String) {
+            runOnUiThread { enqueueDownload(url, sha256, versionCode, versionName) }
+        }
+    }
+
+    private var pendingDownloadId: Long = -1L
+    private var pendingSha256: String = ""
+    private var pendingVersionCode: Long = 0L
+    private var downloadReceiver: BroadcastReceiver? = null
+
+    private fun enqueueDownload(url: String, sha256: String, versionCode: Long, versionName: String) {
+        try {
+            val updatesDir = File(filesDir, "updates")
+            updatesDir.mkdirs()
+            val destFile = File(updatesDir, "financevz.apk")
+            if (destFile.exists()) destFile.delete()
+            val versionFile = File(updatesDir, "version-code.txt")
+            if (versionFile.exists()) versionFile.delete()
+
+            val external = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            external?.mkdirs()
+            val externalFile = File(external, "financevz-update.apk")
+            if (externalFile.exists()) externalFile.delete()
+
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle("financeVZ $versionName")
+                .setDescription("Descargando actualización en segundo plano…")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setMimeType("application/vnd.android.package-archive")
+                .setDestinationUri(Uri.fromFile(externalFile))
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            pendingSha256 = sha256
+            pendingVersionCode = versionCode
+            pendingDownloadId = dm.enqueue(request)
+            prefs.edit()
+                .putLong("pending_download_id", pendingDownloadId)
+                .putString("pending_download_sha", sha256)
+                .putLong("pending_download_version", versionCode)
+                .apply()
+            registerDownloadReceiver()
+            notifyDownload("started", "Descarga iniciada en segundo plano. Puedes cerrar la app.")
+        } catch (e: Exception) {
+            notifyDownload("error", "No se pudo iniciar la descarga: ${e.message}")
+        }
+    }
+
+    private fun registerDownloadReceiver() {
+        if (downloadReceiver != null) return
+        downloadReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: return
+                if (id != pendingDownloadId) return
+                handleDownloadComplete(id)
+            }
+        }
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(downloadReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(downloadReceiver, filter)
+        }
+    }
+
+    private fun handleDownloadComplete(id: Long) {
+        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val query = DownloadManager.Query().setFilterById(id)
+        val cursor = dm.query(query)
+        cursor.use {
+            if (!it.moveToFirst()) {
+                notifyDownload("error", "No se pudo verificar la descarga.")
+                return
+            }
+            val statusIdx = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            val status = if (statusIdx >= 0) it.getInt(statusIdx) else -1
+            if (status != DownloadManager.STATUS_SUCCESSFUL) {
+                notifyDownload("error", "La descarga falló. Intenta de nuevo.")
+                cleanupFailedDownload()
+                return
+            }
+        }
+        val external = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val externalFile = File(external, "financevz-update.apk")
+        if (!externalFile.exists() || externalFile.length() < 1_000_000L) {
+            notifyDownload("error", "El APK descargado no es válido.")
+            cleanupFailedDownload()
+            return
+        }
+        if (pendingSha256.isNotBlank()) {
+            val actual = sha256Hex(externalFile)
+            if (!actual.equals(pendingSha256, ignoreCase = true)) {
+                externalFile.delete()
+                notifyDownload("error", "El hash SHA-256 del APK no coincide.")
+                cleanupFailedDownload()
+                return
+            }
+        }
+        val updatesDir = File(filesDir, "updates")
+        updatesDir.mkdirs()
+        val apk = File(updatesDir, "financevz.apk")
+        if (apk.exists()) apk.delete()
+        externalFile.copyTo(apk, overwrite = true)
+        externalFile.delete()
+        File(updatesDir, "version-code.txt").writeText(pendingVersionCode.toString())
+        prefs.edit().remove("pending_download_id").remove("pending_download_sha").remove("pending_download_version").apply()
+        notifyDownload("completed", "Actualización descargada. Pulsa «Instalar APK descargado».")
+    }
+
+    private fun cleanupFailedDownload() {
+        val updatesDir = File(filesDir, "updates")
+        File(updatesDir, "financevz.apk").delete()
+        File(updatesDir, "version-code.txt").delete()
+        val external = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        File(external, "financevz-update.apk").delete()
+        prefs.edit().remove("pending_download_id").remove("pending_download_sha").remove("pending_download_version").apply()
+    }
+
+    private fun sha256Hex(file: File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).use { input ->
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buf)
+                if (read <= 0) break
+                md.update(buf, 0, read)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun notifyDownload(status: String, message: String) {
+        webView?.post {
+            val payload = JSONObject()
+                .put("kind", "download_result")
+                .put("status", status)
+                .put("message", message)
+            webView?.evaluateJavascript("window.__fvzBridge && window.__fvzBridge.send($payload)", null)
+        }
+    }
+
+    override fun onDestroy() {
+        downloadReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+        }
+        downloadReceiver = null
+        super.onDestroy()
     }
 
     private fun showBiometricPrompt(action: String) {

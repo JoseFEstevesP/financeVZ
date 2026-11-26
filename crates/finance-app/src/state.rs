@@ -492,13 +492,7 @@ impl AppState {
         if let Ok(repo) = self.repo.lock() {
             let _ = repo.set_setting(UPDATE_URL_SETTING, &base);
         }
-        if base.is_empty() {
-            return Ok(UpdateSource::GitHub);
-        }
-        if !(base.starts_with("http://") || base.starts_with("https://")) {
-            return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
-        }
-        Ok(UpdateSource::Local(base))
+        self.prepare_update_source()
     }
 
     pub fn update_app(&mut self, progress: &(dyn Fn(UpdateProgress) + Send + Sync)) {
@@ -513,6 +507,37 @@ impl AppState {
         self.update_status = Some(match platform::install_update(&source, progress) {
             Ok(message) | Err(message) => message,
         });
+    }
+
+    pub fn resolve_update_for_download(&self) -> Result<crate::platform::ResolvedUpdate, String> {
+        let source = self.prepare_update_source()?;
+        crate::platform::resolve_update(&source)
+    }
+
+    fn prepare_update_source(&self) -> Result<UpdateSource, String> {
+        let base = self.update_url.trim().trim_end_matches('/').to_owned();
+        if base.is_empty() {
+            return Ok(UpdateSource::GitHub);
+        }
+        if !(base.starts_with("http://") || base.starts_with("https://")) {
+            return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
+        }
+        Ok(UpdateSource::Local(base))
+    }
+
+    pub fn finish_background_download(&mut self, status: &str, message: &str) {
+        match status {
+            "started" => {
+                self.update_status = Some(message.to_owned());
+            }
+            "completed" => {
+                self.update_status = Some(message.to_owned());
+                self.refresh();
+            }
+            _ => {
+                self.update_status = Some(message.to_owned());
+            }
+        }
     }
 
     pub fn set_entry_currency(&mut self, currency: EntryCurrency) {

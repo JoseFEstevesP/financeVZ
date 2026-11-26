@@ -19,6 +19,8 @@ enum BridgeMessage {
         ok: bool,
         message: String,
     },
+    #[serde(rename = "download_result")]
+    DownloadResult { status: String, message: String },
 }
 
 pub fn use_bridge(mut state: Signal<AppState>) {
@@ -34,6 +36,9 @@ pub fn use_bridge(mut state: Signal<AppState>) {
                         ok,
                         message,
                     } => state.write().finish_biometric(&action, ok, &message),
+                    BridgeMessage::DownloadResult { status, message } => {
+                        state.write().finish_background_download(&status, &message);
+                    }
                     BridgeMessage::Evidence { name, data } => {
                         if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(data) {
                             state.write().attach_evidence(name, &bytes);
@@ -68,6 +73,18 @@ pub fn request_light_theme(light: bool) {
     dioxus::document::eval(&format!(
         "if (window.FinanzasVZBiometric) window.FinanzasVZBiometric.setLightTheme({light});"
     ));
+}
+
+pub fn request_background_download(url: &str, sha256: &str, version_code: i64, version_name: &str) {
+    let url = serde_json::to_string(url).unwrap_or_else(|_| "\"\"".to_owned());
+    let sha = serde_json::to_string(sha256).unwrap_or_else(|_| "\"\"".to_owned());
+    let name = serde_json::to_string(version_name).unwrap_or_else(|_| "\"\"".to_owned());
+    let script = format!(
+        "if (window.FinanzasVZBiometric && window.FinanzasVZBiometric.downloadUpdate) \
+         window.FinanzasVZBiometric.downloadUpdate({url},{sha},{version_code},{name}); \
+         else if (window.__fvzBridge) window.__fvzBridge.send({{kind:'download_result',status:'error',message:'Descarga en segundo plano no disponible en este dispositivo.'}});"
+    );
+    dioxus::document::eval(&script);
 }
 
 // The channel above stays open for the lifetime of the app; these are one-shot commands.

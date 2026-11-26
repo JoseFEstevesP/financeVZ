@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.38] - 2026-11-26
+
+### Añadido
+
+- La actualización de APK puede descargarse en segundo plano con DownloadManager (notificación y continúa si cierras la app). La instalación sigue siendo manual.
+
 ## [0.1.37] - 2026-11-26
 
 ### Corregido

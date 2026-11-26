@@ -1,5 +1,7 @@
 use dioxus::prelude::*;
 
+#[cfg(target_os = "android")]
+use crate::bridge;
 use crate::{
     platform::{self, UpdateProgress},
     state::AppState,
@@ -57,7 +59,7 @@ pub fn Update(props: UpdateProps) -> Element {
                 }
                 p { class: "muted", "Fuente actual: {source_label}." }
                 p { class: "muted",
-                    "Se busca la última versión publicada y se descarga el APK. La instalación siempre la confirmas tú con un clic; nunca se instala automáticamente."
+                    "Se busca la última versión publicada y se descarga el APK en segundo plano (puedes cerrar la app). La instalación siempre la confirmas tú con un clic; nunca se instala automáticamente."
                 }
                 details { class: "update-advanced",
                     summary { "Usar un servidor local (opciones avanzadas)" }
@@ -102,42 +104,77 @@ pub fn Update(props: UpdateProps) -> Element {
                         disabled: progress().is_some(),
                         onclick: move |_| {
                             let mut target = state;
-                            let prepared = {
-                                let mut state_guard = target.write();
-                                state_guard.prepare_update()
+                            let resolved = {
+                                let state_guard = target.read();
+                                state_guard.resolve_update_for_download()
                             };
-                            let source = match prepared {
-                                Ok(source) => source,
+                            let resolved = match resolved {
+                                Ok(resolved) => resolved,
                                 Err(message) => {
                                     target.write().update_status = Some(message);
                                     return;
                                 }
                             };
-                            let bar = std::sync::Arc::new(std::sync::Mutex::new(progress));
-                            let message_signal = std::sync::Arc::new(std::sync::Mutex::new(result));
-                            if let Ok(mut signal) = message_signal.lock() {
-                                signal.set(None);
+                            let (local_code, _) = platform::local_version();
+                            if resolved.info.version_code <= local_code {
+                                target.write().update_status =
+                                    Some(format!("Ya tienes la última versión instalada ({}).", resolved.info.version_name));
+                                return;
                             }
-                            if let Ok(mut signal) = bar.lock() {
-                                signal.set(Some(UpdateProgress::Checking));
+                            #[cfg(target_os = "android")]
+                            {
+                                let sha = resolved.info.sha256.clone().unwrap_or_default();
+                                if sha.trim().is_empty() {
+                                    target.write().update_status =
+                                        Some("La actualización no incluye SHA-256; no se puede descargar en segundo plano.".into());
+                                    return;
+                                }
+                                target.write().update_status =
+                                    Some("Iniciando descarga en segundo plano…".into());
+                                bridge::request_background_download(
+                                    &resolved.apk_url,
+                                    &sha,
+                                    resolved.info.version_code,
+                                    &resolved.info.version_name,
+                                );
                             }
-                            std::thread::spawn(move || {
-                                let reporter = bar.clone();
-                                let callback = move |step| {
-                                    if let Ok(mut signal) = reporter.lock() {
-                                        signal.set(Some(step));
+                            #[cfg(not(target_os = "android"))]
+                            {
+                                let bar = std::sync::Arc::new(std::sync::Mutex::new(progress));
+                                let message_signal =
+                                    std::sync::Arc::new(std::sync::Mutex::new(result));
+                                let prepared = target.write().prepare_update();
+                                let source = match prepared {
+                                    Ok(source) => source,
+                                    Err(message) => {
+                                        target.write().update_status = Some(message);
+                                        return;
                                     }
                                 };
-                                let message = match platform::download_update(&source, &callback) {
-                                    Ok(message) | Err(message) => message,
-                                };
                                 if let Ok(mut signal) = message_signal.lock() {
-                                    signal.set(Some(message));
-                                }
-                                if let Ok(mut signal) = bar.lock() {
                                     signal.set(None);
                                 }
-                            });
+                                if let Ok(mut signal) = bar.lock() {
+                                    signal.set(Some(UpdateProgress::Checking));
+                                }
+                                std::thread::spawn(move || {
+                                    let reporter = bar.clone();
+                                    let callback = move |step| {
+                                        if let Ok(mut signal) = reporter.lock() {
+                                            signal.set(Some(step));
+                                        }
+                                    };
+                                    let message = match platform::download_update(&source, &callback) {
+                                        Ok(message) | Err(message) => message,
+                                    };
+                                    if let Ok(mut signal) = message_signal.lock() {
+                                        signal.set(Some(message));
+                                    }
+                                    if let Ok(mut signal) = bar.lock() {
+                                        signal.set(None);
+                                    }
+                                });
+                            }
                         },
                         "Buscar y descargar"
                     }
