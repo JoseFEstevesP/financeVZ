@@ -174,6 +174,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
     let cashea_initial = snapshot.cashea_initial.clone();
     let cashea_installments = snapshot.cashea_installments.clone();
     let cashea_installment = snapshot.cashea_installment.clone();
+    let cashea_purchase_date = snapshot.cashea_purchase_date.clone();
     let credit_closing_day = snapshot.credit_closing_day.clone();
     let credit_due_day = snapshot.credit_due_day.clone();
     let entry_currency = snapshot.entry_currency;
@@ -338,8 +339,16 @@ pub fn Payments(props: PaymentsProps) -> Element {
                 }
                 if payment_method == PaymentMethod::Cashea {
                     p { class: "muted",
-                        "Cashea sin interés: pagas una inicial hoy y el resto en cuotas cada 14 días. La app calcula cada cuota con la tasa BCV vigente en su fecha."
+                        "Cashea sin interés: pagas una inicial en la fecha de compra y el resto en cuotas cada 14 días. La app calcula cada cuota con la tasa BCV vigente en su fecha."
                     }
+                    label { class: "field-label", "Fecha de compra" }
+                    input {
+                        class: "text-input",
+                        r#type: "date",
+                        value: cashea_purchase_date,
+                        oninput: move |event| { state.write().cashea_purchase_date = event.value(); },
+                    }
+                    p { class: "date-hint", "Las cuotas se calculan cada 14 días desde esta fecha." }
                     label { class: "field-label", "Pago inicial" }
                     input {
                         class: "amount-input",

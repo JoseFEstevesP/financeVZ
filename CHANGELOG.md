@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.40] - 2026-11-26
+
+### Corregido
+
+- Cashea: se puede indicar la **fecha de compra**; las cuotas e inicial se calculan desde esa fecha (cada 14 días), evitando fechas de pago incorrectas al registrar compras pasadas.
+
 ## [0.1.39] - 2026-11-26
 
 ### Añadido

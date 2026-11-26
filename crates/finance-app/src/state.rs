@@ -170,6 +170,7 @@ pub struct AppState {
     pub cashea_initial: String,
     pub cashea_installments: String,
     pub cashea_installment: String,
+    pub cashea_purchase_date: String,
     pub credit_closing_day: String,
     pub credit_due_day: String,
     pub payment_category_id: Option<CategoryId>,
@@ -247,6 +248,7 @@ impl AppState {
             cashea_initial: String::new(),
             cashea_installments: "3".to_owned(),
             cashea_installment: String::new(),
+            cashea_purchase_date: Local::now().date_naive().to_string(),
             credit_closing_day: String::new(),
             credit_due_day: String::new(),
             payment_category_id: None,
@@ -1219,8 +1221,9 @@ impl AppState {
             self.feedback = Some("El total de la compra debe ser mayor a 0".into());
             return;
         }
-        let today = Local::now().date_naive();
-        let Some((_, initial_rate)) = self.rate_for(today) else {
+        let purchase_date = NaiveDate::parse_from_str(&self.cashea_purchase_date, "%Y-%m-%d")
+            .unwrap_or_else(|_| Local::now().date_naive());
+        let Some((_, initial_rate)) = self.rate_for(purchase_date) else {
             self.feedback = Some("Configura la tasa del dólar para convertir bolívares".into());
             return;
         };
@@ -1238,11 +1241,11 @@ impl AppState {
                 amount,
                 category_id,
                 note: Some(format!("{name} · inicial Cashea")),
-                spent_at: local_moment_at(today),
-                local_date: today,
+                spent_at: local_moment_at(purchase_date),
+                local_date: purchase_date,
                 evidence_path: None,
                 rate_cents: Some(initial_rate),
-                rate_day: self.rate_for(today).map(|(day, _)| day.to_string()),
+                rate_day: self.rate_for(purchase_date).map(|(day, _)| day.to_string()),
                 method: MovementMethod::ExternalPage,
                 original_amount_cents: (self.entry_currency == EntryCurrency::Ves)
                     .then_some(initial),
@@ -1274,7 +1277,7 @@ impl AppState {
         let mut created = 0usize;
         let mut failed = 0usize;
         for index in 1..=count {
-            let due = today + Duration::days(14 * index as i64);
+            let due = purchase_date + Duration::days(14 * index as i64);
             let Some((rate_day, usd_rate)) = self.rate_for(due) else {
                 failed += 1;
                 continue;
@@ -1326,6 +1329,7 @@ impl AppState {
         self.cashea_initial.clear();
         self.cashea_installments = "3".to_owned();
         self.cashea_installment.clear();
+        self.cashea_purchase_date = Local::now().date_naive().to_string();
         self.payment_note.clear();
         self.payment_amount.clear();
         self.feedback = Some(if failed == 0 && initial_ok {
