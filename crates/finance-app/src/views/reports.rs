@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::charts::{Bars, Donut},
-    state::{AppState, format_date, money_usd, money_ves},
+    state::{AppState, View, format_date, money_usd, money_ves},
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -90,6 +90,16 @@ pub fn Reports(props: ReportsProps) -> Element {
                             }
                         }
                     }
+                }
+            }
+
+            div { class: "card",
+                h3 { "Detalle de movimientos" }
+                p { class: "muted", "Tabla con gastos, ingresos y pagos." }
+                button {
+                    class: "link",
+                    onclick: move |_| state.write().set_view(View::Search),
+                    "Abrir detalle →"
                 }
             }
 

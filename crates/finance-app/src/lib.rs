@@ -299,12 +299,13 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .dot { width: .6875rem; height: .6875rem; border-radius: 50%; display: inline-block; flex: none; }
 .legend-name { flex: 1; }
 .legend-value { color: var(--chip-text); font-variant-numeric: tabular-nums; }
-.expense-row { display: flex; align-items: center; gap: .6875rem; padding: .625rem 0;
+.expense-row { display: flex; align-items: center; gap: .75rem; padding: .75rem 0;
   border-bottom: 1px solid var(--row-border); }
 .expense-icon { width: 2.25rem; height: 2.25rem; display: grid; place-items: center;
-  background: var(--input-bg); border-radius: .625rem; font-size: 1.125rem; }
-.expense-info { flex: 1; display: flex; flex-direction: column; }
-.expense-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+  background: var(--input-bg); border-radius: .625rem; font-size: 1.125rem; flex: none; }
+.expense-info { flex: 1; display: flex; flex-direction: column; gap: .125rem; min-width: 0; }
+.expense-amount { font-variant-numeric: tabular-nums; font-weight: 600; flex: none; }
+.expense-actions { display: flex; flex-direction: column; gap: .125rem; flex: none; }
 .table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--row-border);
   border-radius: .75rem; }
 .data-table { width: 100%; min-width: 46rem; border-collapse: collapse; font-size: .8125rem; }

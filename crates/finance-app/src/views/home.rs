@@ -85,6 +85,9 @@ pub fn Home(props: HomeProps) -> Element {
     let month_total_ves = state
         .month_total_ves(rate)
         .or_else(|| money_ves(month_total, rate));
+    let month_income_ves = state
+        .month_income_total_ves(rate)
+        .or_else(|| money_ves(month_income, rate));
     let rate_label = state.latest_rate_label();
     drop(state);
 
@@ -115,8 +118,21 @@ pub fn Home(props: HomeProps) -> Element {
                 }
                 div { class: "row-buttons",
                     button { class: "primary", onclick: move |_| props.go_add.call(()), "+ Añadir gasto" }
-                    button { class: "chip", onclick: move |_| app_state.write().set_view(View::AddIncome),
-                        "+ Ingreso"
+                }
+            }
+
+            div { class: "hero compact",
+                span { class: "muted", "Ingresos de este mes" }
+                h2 { class: "amount", "{money_usd(month_income)}" }
+                if let Some(ves) = month_income_ves.clone() {
+                    p { class: "secondary-amount", "{ves}" }
+                }
+                div { class: "row-buttons",
+                    button { class: "primary", onclick: move |_| app_state.write().set_view(View::AddIncome),
+                        "+ Añadir ingreso"
+                    }
+                    button { class: "chip", onclick: move |_| app_state.write().set_view(View::Income),
+                        "Ver ingresos"
                     }
                 }
             }
@@ -216,23 +232,25 @@ pub fn Home(props: HomeProps) -> Element {
                                 }
                             }
                             span { class: "expense-amount", "{expense.amount}" }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Devolver gasto",
-                                onclick: move |_| app_state.write().refund_expense(expense.id),
-                                Icon { name: "income", class: "icon" }
-                            }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Editar gasto",
-                                onclick: move |_| app_state.write().begin_edit_expense(expense.id),
-                                Icon { name: "edit", class: "icon" }
-                            }
-                            button {
-                                class: "icon-button",
-                                aria_label: "Eliminar gasto",
-                                onclick: move |_| app_state.write().request_remove_expense(expense.id),
-                                Icon { name: "close", class: "icon" }
+                            div { class: "expense-actions",
+                                button {
+                                    class: "icon-button",
+                                    aria_label: "Devolver gasto",
+                                    onclick: move |_| app_state.write().refund_expense(expense.id),
+                                    Icon { name: "income", class: "icon" }
+                                }
+                                button {
+                                    class: "icon-button",
+                                    aria_label: "Editar gasto",
+                                    onclick: move |_| app_state.write().begin_edit_expense(expense.id),
+                                    Icon { name: "edit", class: "icon" }
+                                }
+                                button {
+                                    class: "icon-button",
+                                    aria_label: "Eliminar gasto",
+                                    onclick: move |_| app_state.write().request_remove_expense(expense.id),
+                                    Icon { name: "close", class: "icon" }
+                                }
                             }
                         }
                     }
