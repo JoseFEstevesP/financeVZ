@@ -2,6 +2,17 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.36] - 2026-11-25
+
+### Añadido
+
+- Tarjeta de **Ingresos de este mes** en Inicio, con total en USD, equivalente en Bs y accesos para añadir o ver ingresos.
+- Acceso al detalle de movimientos desde Reportes.
+
+### Cambiado
+
+- Los botones de «Últimos gastos» (devolver, editar y eliminar) se muestran en columna, con más espacio entre los datos de cada gasto.
+
 ## [0.1.35] - 2026-11-25
 
 ### Corregido
