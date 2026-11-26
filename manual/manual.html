@@ -147,15 +147,15 @@
 <h2 class="chapter-title" id="c-2">2. Inicio</h2>
 <section class="module">
 	<h3><span class="num">2.1</span> Resumen del mes</h3>
-	<p class="desc">La tarjeta principal muestra el balance, los gastos y los ingresos del mes en USD, con su equivalente en bolívares al lado. La tarjeta de tasa indica el valor usado y su origen (automático o manual).</p>
+	<p class="desc">Las tarjetas <b>Gastos de este mes</b> e <b>Ingresos de este mes</b> muestran cada total en USD y su equivalente en bolívares, con accesos para añadir movimientos. Más abajo, <b>Resumen del mes</b> reúne ingresos, gastos y balance. La tarjeta de tasa indica el valor usado y su origen (automático o manual).</p>
 	<p class="desc">Debajo aparece la distribución de gastos por categoría, con un gráfico de dona y el porcentaje de cada categoría. Es útil para ver de un vistazo hacia dónde va el dinero.</p>
 
 	<h3><span class="num">2.2</span> Últimos gastos y accesos rápidos</h3>
-	<p class="desc">El bloque <b>Últimos gastos</b> lista los movimientos recientes con categoría, fecha, tipo de movimiento e importe. Desde cada fila puedes ver la evidencia adjunta, devolver el gasto, editarlo o eliminarlo. El botón <b>+ Añadir gasto</b> abre el formulario nuevo; <b>Ingreso</b> hace lo propio para ingresos.</p>
+	<p class="desc">El bloque <b>Últimos gastos</b> lista los movimientos recientes con categoría, fecha, tipo de movimiento e importe. Los botones para ver la evidencia, devolver, editar y eliminar están apilados en columna, con más espacio entre filas. El botón <b>+ Añadir gasto</b> abre el formulario nuevo; <b>+ Añadir ingreso</b> hace lo propio para ingresos.</p>
 	<p class="desc">Los enlaces <b>Ver reportes →</b>, <b>Ver pagos →</b> y <b>Ver ingresos →</b> llevan a esas secciones. Si hay pagos pendientes, el aviso <b>Pagos por hacer: N</b> muestra cuántos tienes.</p>
 	<div class="workflow-box"><strong>Flujo típico:</strong> abre Inicio → revisa el balance → toca <b>+ Añadir gasto</b> → guarda → comprueba que el gasto aparece en Últimos gastos y en la distribución.</div>
 	<p class="extra">Desliza hacia arriba para ver la lista completa de movimientos; la pantalla tiene scroll.</p>
-	<figure><img src="../capturas/02-inicio-detalle.webp" alt="Inicio desplazado a Últimos gastos"><figcaption>Inicio desplazado: distribución y últimos gastos.</figcaption></figure>
+	<figure><img src="../capturas/02-inicio-detalle.webp" alt="Inicio desplazado a Últimos gastos"><figcaption>Inicio desplazado: últimos gastos con los botones en columna.</figcaption></figure>
 </section>
 
 <h2 class="chapter-title" id="c-3">3. Gastos e ingresos</h2>
@@ -179,10 +179,10 @@
 	<figure><img src="../capturas/09-tipo-movimiento.webp" alt="Selector de tipo de movimiento"><figcaption>Tipo de movimiento en el formulario de gasto.</figcaption></figure>
 
 	<h3><span class="num">3.2</span> Registrar un ingreso</h3>
-	<p class="desc">Desde Inicio, toca <b>Ingreso</b>. El formulario es equivalente: importe, moneda, <b>Tipo de movimiento</b>, <b>Categoría de ingreso</b>, <b>Fecha del ingreso</b>, tasa opcional y nota. Guarda con <b>Guardar ingreso</b>.</p>
+	<p class="desc">Desde Inicio, toca <b>+ Añadir ingreso</b> (o <b>Ver ingresos</b> para consultarlos). El formulario es equivalente: importe, moneda, <b>Tipo de movimiento</b>, <b>Categoría de ingreso</b>, <b>Fecha del ingreso</b>, tasa opcional y nota. Guarda con <b>Guardar ingreso</b>.</p>
 
 	<h3><span class="num">3.3</span> Editar, eliminar y buscar</h3>
-	<p class="desc">En la lista de Últimos gastos, los iconos permiten <b>Devolver gasto</b>, <b>Editar gasto</b> y <b>Eliminar gasto</b>. Al eliminar aparece una confirmación; si el gasto tenía imagen de evidencia, también se borra. <b>Buscar movimientos</b> abre la búsqueda por texto, categoría y rango de fechas, con los mismos botones para gastos y de ingresos. La evidencia se consulta con <b>Ver evidencia</b> y se cierra desde el visor.</p>
+	<p class="desc">En la lista de Últimos gastos, los botones <b>Devolver gasto</b>, <b>Editar gasto</b> y <b>Eliminar gasto</b> aparecen en columna. Al eliminar aparece una confirmación; si el gasto tenía imagen de evidencia, también se borra. <b>Buscar movimientos</b> abre la búsqueda por texto, categoría y rango de fechas, con los mismos botones para gastos y de ingresos. La evidencia se consulta con <b>Ver evidencia</b> y se cierra desde el visor.</p>
 	<div class="tip-box"><strong>Devolución:</strong> toca el icono de devolución en un gasto y se crea un ingreso del mismo importe, fecha, tasa y tipo de movimiento, con la nota «Devolución de …» en la categoría <b>Otros</b>. El gasto original se conserva en el historial.</div>
 	<div class="tip-box"><strong>Consejo:</strong> si el importe escrito no coincide con lo esperado, revisa que hayas tecleado centavos (por ejemplo <code>85789</code> para 857,89) y no un número con punto decimal.</div>
 </section>
@@ -193,7 +193,7 @@
 	<figure><img src="../capturas/03-reportes.webp" alt="Pantalla de Reportes"><figcaption>Reportes: resumen, distribución e historial.</figcaption></figure>
 
 	<h3><span class="num">4.1</span> Períodos y categorías</h3>
-	<p class="desc">Los interruptores <b>Por mes</b> y <b>Por categoría</b> cambian la vista del gráfico. La sección <b>Ingresos por categoría</b> muestra cuánto aporta cada categoría, y <b>Gastos registrados</b> el detalle del período. Si aún no hay movimientos, aparece <b>Sin datos para mostrar</b>.</p>
+	<p class="desc">Los interruptores <b>Por mes</b> y <b>Por categoría</b> cambian la vista del gráfico. La sección <b>Ingresos por categoría</b> muestra cuánto aporta cada categoría, y <b>Gastos registrados</b> el detalle del período. El enlace <b>Abrir detalle →</b> abre la tabla con gastos, ingresos y pagos. Si aún no hay movimientos, aparece <b>Sin datos para mostrar</b>.</p>
 	<div class="purpose-box"><strong>Para qué sirve:</strong> comparar lo que entra y sale, detectar categorías que se salen del presupuesto y seguir la evolución mes a mes.</div>
 
 	<h3><span class="num">4.2</span> Tasa del dólar</h3>
