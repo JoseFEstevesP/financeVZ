@@ -25,6 +25,7 @@ const MIGRATIONS: &[M<'_>] = &[
     M::up(include_str!("../migrations/0007_movement_method.sql")),
     M::up(include_str!("../migrations/0008_activity_log.sql")),
     M::up(include_str!("../migrations/0009_original_amount.sql")),
+    M::up(include_str!("../migrations/0010_credit_card.sql")),
 ];
 
 pub struct SqliteRepository {
@@ -430,7 +431,8 @@ impl SqliteRepository {
 
         let mut stmt = self.conn.prepare(
             "SELECT id, name, amount_cents, currency, category_id, due_day, due_date,
-                    payment_method, kind, note, last_paid_period, is_active
+                    payment_method, kind, note, last_paid_period, is_active,
+                    statement_closing_day, payment_due_day
              FROM recurring_payments ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -447,6 +449,8 @@ impl SqliteRepository {
                 note: row.get(9)?,
                 last_paid_period: row.get(10)?,
                 is_active: row.get::<_, i64>(11)? == 1,
+                statement_closing_day: row.get(12)?,
+                payment_due_day: row.get(13)?,
             })
         })?;
         backup.payments = rows.collect::<Result<Vec<_>, _>>()?;
@@ -606,8 +610,8 @@ impl SqliteRepository {
             tx.execute(
                 "INSERT INTO recurring_payments (id, name, amount_cents, currency, category_id,
                         due_day, due_date, payment_method, kind, note, last_paid_period, is_active,
-                        created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                        statement_closing_day, payment_due_day, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                 params![
                     payment.id,
                     payment.name,
@@ -621,6 +625,8 @@ impl SqliteRepository {
                     payment.note,
                     payment.last_paid_period,
                     i64::from(payment.is_active),
+                    payment.statement_closing_day,
+                    payment.payment_due_day,
                     backup.exported_at,
                     backup.exported_at,
                 ],
@@ -761,7 +767,8 @@ impl SqliteRepository {
     pub fn recurring_payments(&self) -> Result<Vec<RecurringPayment>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, kind, name, amount_cents, currency, category_id, due_day,
-                    due_date, payment_method, note, last_paid_period, is_active
+                    due_date, payment_method, note, last_paid_period, is_active,
+                    statement_closing_day, payment_due_day
              FROM recurring_payments WHERE is_active = 1 ORDER BY due_date, due_day, name",
         )?;
         let rows = stmt.query_map([], mapping::recurring_from_row)?;
@@ -778,8 +785,8 @@ impl SqliteRepository {
         self.conn.execute(
             "INSERT INTO recurring_payments
              (kind, name, amount_cents, currency, category_id, due_day, due_date,
-              payment_method, note, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+              payment_method, note, statement_closing_day, payment_due_day, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 new.kind.as_str(),
                 new.name.trim(),
@@ -790,6 +797,8 @@ impl SqliteRepository {
                 new.due_date.map(|day| day.to_string()),
                 new.method.as_str(),
                 new.note,
+                new.statement_closing_day.map(i64::from),
+                new.payment_due_day.map(i64::from),
                 now,
                 now,
             ],

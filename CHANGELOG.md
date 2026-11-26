@@ -2,6 +2,13 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [0.1.39] - 2026-11-26
+
+### Añadido
+
+- Pagos: nuevo método **Tarjeta de crédito** (opción A) con día de corte y día límite de pago; monto variable (puede ser 0).
+- Recomendación en fila de tarjeta de crédito: pagar 1 día antes del corte para reportar menor saldo y pagar antes del límite para evitar mora/intereses (orientación general, confirmar con emisor).
+
 ## [0.1.38] - 2026-11-26
 
 ### Añadido

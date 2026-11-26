@@ -119,6 +119,8 @@ mod tests {
             due_date: None,
             method: PaymentMethod::Cashea,
             note: Some("Cuota 1/6".into()),
+            statement_closing_day: None,
+            payment_due_day: None,
         };
         let id = repo.add_recurring_payment(&payment).unwrap();
         let payments = repo.recurring_payments().unwrap();
@@ -172,6 +174,8 @@ mod tests {
             due_date: Some(due),
             method: PaymentMethod::Cashea,
             note: Some("Cuota 3/6".into()),
+            statement_closing_day: None,
+            payment_due_day: None,
         };
         let id = repo.add_recurring_payment(&payment).unwrap();
         let payments = repo.recurring_payments().unwrap();

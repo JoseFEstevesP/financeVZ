@@ -160,6 +160,10 @@ pub struct BackupPayment {
     pub note: Option<String>,
     pub last_paid_period: Option<String>,
     pub is_active: bool,
+    #[serde(default)]
+    pub statement_closing_day: Option<i64>,
+    #[serde(default)]
+    pub payment_due_day: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use finance_core::{
-    CategoryId, PaymentMethod, PaymentStatus, RecurringKind, RecurringPaymentId, format_cents_input,
+    CategoryId, PaymentMethod, PaymentStatus, RecurringKind, RecurringPayment, RecurringPaymentId,
+    format_cents_input,
 };
 
 use crate::{
@@ -71,8 +72,51 @@ struct PaymentRow {
     status: String,
     kind: RecurringKind,
     detail: String,
+    recommendation: Option<String>,
     done: bool,
     urgent: bool,
+}
+
+fn next_monthly_day(today: chrono::NaiveDate, day: u8) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    let clamp = |y: i32, m: u32, d: u8| {
+        (1..=d)
+            .rev()
+            .find_map(|d| chrono::NaiveDate::from_ymd_opt(y, m, d.into()))
+            .unwrap_or(today)
+    };
+    let this = clamp(today.year(), today.month(), day);
+    if this >= today {
+        return this;
+    }
+    let (y, m) = if today.month() == 12 {
+        (today.year() + 1, 1)
+    } else {
+        (today.year(), today.month() + 1)
+    };
+    clamp(y, m, day)
+}
+
+fn credit_recommendation(payment: &RecurringPayment, today: chrono::NaiveDate) -> Option<String> {
+    if payment.method != PaymentMethod::CreditCard {
+        return None;
+    }
+    let closing = payment.statement_closing_day?;
+    let due = payment.payment_due_day?;
+    let next_closing = next_monthly_day(today, closing);
+    let before_closing = next_closing.pred_opt()?;
+    let next_due = next_monthly_day(today, due);
+    let amount = crate::state::money_usd(payment.amount.cents());
+    let amount_note = if payment.amount.cents() > 0 {
+        format!("Paga {amount} ")
+    } else {
+        "Paga el saldo ".to_owned()
+    };
+    Some(format!(
+        "{amount_note}antes del {} (1 día antes del corte) para reportar menor saldo; paga antes del {} para evitar mora/intereses. Orientación general, confirma con tu emisor.",
+        crate::state::format_date(before_closing),
+        crate::state::format_date(next_due)
+    ))
 }
 
 #[component]
@@ -90,11 +134,20 @@ pub fn Payments(props: PaymentsProps) -> Element {
                 None => format!("día {}", payment.due_day),
             };
             let mut detail = vec![payment.method.label().to_owned(), schedule];
+            if payment.method == PaymentMethod::CreditCard {
+                if let (Some(close), Some(due)) =
+                    (payment.statement_closing_day, payment.payment_due_day)
+                {
+                    detail.push(format!("corte día {close}"));
+                    detail.push(format!("límite día {due}"));
+                }
+            }
             if let Some(note) = payment.note.as_deref()
                 && !note.trim().is_empty()
             {
                 detail.push(note.trim().to_owned());
             }
+            let recommendation = credit_recommendation(payment, chrono::Local::now().date_naive());
             PaymentRow {
                 id: payment.id,
                 name: payment.name.clone(),
@@ -103,6 +156,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                 status: payment_status_text(status),
                 kind: payment.kind,
                 detail: detail.join(" · "),
+                recommendation,
                 done: status == PaymentStatus::Paid,
                 urgent: matches!(
                     status,
@@ -120,6 +174,8 @@ pub fn Payments(props: PaymentsProps) -> Element {
     let cashea_initial = snapshot.cashea_initial.clone();
     let cashea_installments = snapshot.cashea_installments.clone();
     let cashea_installment = snapshot.cashea_installment.clone();
+    let credit_closing_day = snapshot.credit_closing_day.clone();
+    let credit_due_day = snapshot.credit_due_day.clone();
     let entry_currency = snapshot.entry_currency;
     let cashea_total = crate::state::parse_cents(&snapshot.payment_amount)
         .map(|cents| format_cents_input(&cents.to_string(), entry_currency.code()))
@@ -145,6 +201,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
         PaymentMethod::Cashea,
         PaymentMethod::Transfer,
         PaymentMethod::Cash,
+        PaymentMethod::CreditCard,
         PaymentMethod::Other,
     ];
 
@@ -165,6 +222,9 @@ pub fn Payments(props: PaymentsProps) -> Element {
                                 small { class: "muted", "{row.kind.label()}" }
                                 small { class: if row.urgent { "muted urgent" } else { "muted" }, "{row.status}" }
                                 small { class: "muted", "{row.detail}" }
+                                if let Some(recommendation) = row.recommendation {
+                                    small { class: "muted", "{recommendation}" }
+                                }
                                 if let Some(secondary) = row.secondary {
                                     small { class: "muted", "{secondary}" }
                                 }
@@ -211,7 +271,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                         "Bs"
                     }
                 }
-                if payment_method != PaymentMethod::Cashea {
+                if payment_method != PaymentMethod::Cashea && payment_method != PaymentMethod::CreditCard {
                     label { class: "field-label", "Tipo de registro" }
                     div { class: "category-grid two",
                         button {
@@ -237,6 +297,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                                 PaymentMethod::Cashea => "cashea",
                                 PaymentMethod::Transfer => "transfer",
                                 PaymentMethod::Cash => "cash",
+                                PaymentMethod::CreditCard => "card",
                                 PaymentMethod::Other => "other",
                             },
                             active: payment_method == method,
@@ -245,7 +306,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                     }
                 }
                 if payment_method != PaymentMethod::Cashea {
-                    label { class: "field-label", "Importe" }
+                    label { class: "field-label", if payment_method == PaymentMethod::CreditCard { "Monto a pagar (variable, puede ser 0)" } else { "Importe" } }
                     input {
                         class: "amount-input",
                         value: amount_display,
@@ -258,7 +319,7 @@ pub fn Payments(props: PaymentsProps) -> Element {
                     }
                 }
 
-                if payment_method != PaymentMethod::Cashea {
+                if payment_method != PaymentMethod::Cashea && payment_method != PaymentMethod::CreditCard {
                     label { class: "field-label", "Tipo de pago" }
                     div { class: "category-grid two",
                         button {
@@ -320,6 +381,34 @@ pub fn Payments(props: PaymentsProps) -> Element {
                         },
                     }
                     p { class: "muted", "Total de la compra: {cashea_total}" }
+                } else if payment_method == PaymentMethod::CreditCard {
+                    p { class: "muted",
+                        "Tarjeta de crédito: registra día de corte y día límite. El monto es variable; actualízalo cuando llegue el estado de cuenta."
+                    }
+                    label { class: "field-label", "Día de corte" }
+                    input {
+                        class: "text-input",
+                        value: credit_closing_day,
+                        inputmode: "numeric",
+                        placeholder: "20",
+                        maxlength: "2",
+                        oninput: move |event| {
+                            let digits: String = event.value().chars().filter(|c| c.is_ascii_digit()).collect();
+                            state.write().credit_closing_day = digits;
+                        },
+                    }
+                    label { class: "field-label", "Día límite de pago" }
+                    input {
+                        class: "text-input",
+                        value: credit_due_day,
+                        inputmode: "numeric",
+                        placeholder: "15",
+                        maxlength: "2",
+                        oninput: move |event| {
+                            let digits: String = event.value().chars().filter(|c| c.is_ascii_digit()).collect();
+                            state.write().credit_due_day = digits;
+                        },
+                    }
                 } else if payment_kind == PaymentKind::Monthly {
                     label { class: "field-label", "Día de vencimiento" }
                     input {

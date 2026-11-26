@@ -170,6 +170,8 @@ pub struct AppState {
     pub cashea_initial: String,
     pub cashea_installments: String,
     pub cashea_installment: String,
+    pub credit_closing_day: String,
+    pub credit_due_day: String,
     pub payment_category_id: Option<CategoryId>,
     pub feedback: Option<String>,
     pub toast: Option<String>,
@@ -245,6 +247,8 @@ impl AppState {
             cashea_initial: String::new(),
             cashea_installments: "3".to_owned(),
             cashea_installment: String::new(),
+            credit_closing_day: String::new(),
+            credit_due_day: String::new(),
             payment_category_id: None,
             feedback: None,
             toast: None,
@@ -1079,7 +1083,13 @@ impl AppState {
         if self.payment_method == PaymentMethod::Cashea {
             return self.add_cashea_payment(name, category_id);
         }
-        let Some(cents) = parse_cents(&self.payment_amount) else {
+        let is_credit = self.payment_method == PaymentMethod::CreditCard;
+        let cents = if is_credit && self.payment_amount.trim().is_empty() {
+            Some(0)
+        } else {
+            parse_cents(&self.payment_amount)
+        };
+        let Some(cents) = cents else {
             self.feedback = Some("Escribe un importe válido".into());
             return;
         };
@@ -1087,24 +1097,40 @@ impl AppState {
             self.feedback = Some("Configura la tasa del dólar para convertir bolívares".into());
             return;
         };
-        let (due_day, due_date) = match self.payment_kind {
-            PaymentKind::Monthly => {
-                let Ok(day) = self.payment_day.trim().parse::<u8>() else {
-                    self.feedback = Some("Escribe el día de vencimiento (1-31)".into());
-                    return;
-                };
-                if !(1..=31).contains(&day) {
-                    self.feedback = Some("El día debe estar entre 1 y 31".into());
-                    return;
-                }
-                (day, None)
+        let (due_day, due_date, statement_closing_day, payment_due_day) = if is_credit {
+            let Ok(closing) = self.credit_closing_day.trim().parse::<u8>() else {
+                self.feedback = Some("Escribe el día de corte (1-31)".into());
+                return;
+            };
+            let Ok(due) = self.credit_due_day.trim().parse::<u8>() else {
+                self.feedback = Some("Escribe el día límite de pago (1-31)".into());
+                return;
+            };
+            if !(1..=31).contains(&closing) || !(1..=31).contains(&due) {
+                self.feedback = Some("Los días de corte y límite deben estar entre 1 y 31".into());
+                return;
             }
-            PaymentKind::OneTime => {
-                let Ok(date) = NaiveDate::parse_from_str(&self.payment_date, "%Y-%m-%d") else {
-                    self.feedback = Some("Elige la fecha del pago".into());
-                    return;
-                };
-                (date.day() as u8, Some(date))
+            (due, None, Some(closing), Some(due))
+        } else {
+            match self.payment_kind {
+                PaymentKind::Monthly => {
+                    let Ok(day) = self.payment_day.trim().parse::<u8>() else {
+                        self.feedback = Some("Escribe el día de vencimiento (1-31)".into());
+                        return;
+                    };
+                    if !(1..=31).contains(&day) {
+                        self.feedback = Some("El día debe estar entre 1 y 31".into());
+                        return;
+                    }
+                    (day, None, None, None)
+                }
+                PaymentKind::OneTime => {
+                    let Ok(date) = NaiveDate::parse_from_str(&self.payment_date, "%Y-%m-%d") else {
+                        self.feedback = Some("Elige la fecha del pago".into());
+                        return;
+                    };
+                    (date.day() as u8, Some(date), None, None)
+                }
             }
         };
         let Ok(currency) = Currency::new(DEFAULT_CURRENCY) else {
@@ -1128,6 +1154,8 @@ impl AppState {
             due_date,
             method: self.payment_method,
             note,
+            statement_closing_day,
+            payment_due_day,
         };
         let result = self
             .repo
@@ -1141,9 +1169,15 @@ impl AppState {
                 self.payment_amount.clear();
                 self.payment_day.clear();
                 self.payment_note.clear();
-                self.feedback = Some(match self.payment_kind {
-                    PaymentKind::Monthly => "Pago mensual creado".into(),
-                    PaymentKind::OneTime => "Pago en fecha única creado".into(),
+                self.credit_closing_day.clear();
+                self.credit_due_day.clear();
+                self.feedback = Some(if is_credit {
+                    "Tarjeta de crédito creada".into()
+                } else {
+                    match self.payment_kind {
+                        PaymentKind::Monthly => "Pago mensual creado".into(),
+                        PaymentKind::OneTime => "Pago en fecha única creado".into(),
+                    }
                 });
                 self.refresh();
             }
@@ -1267,6 +1301,8 @@ impl AppState {
                 due_date: Some(due),
                 method: PaymentMethod::Cashea,
                 note: Some(note),
+                statement_closing_day: None,
+                payment_due_day: None,
             };
             match self
                 .repo

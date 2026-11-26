@@ -11,6 +11,7 @@ pub enum PaymentMethod {
     Cashea,
     Transfer,
     Cash,
+    CreditCard,
     #[default]
     Other,
 }
@@ -21,6 +22,7 @@ impl PaymentMethod {
             Self::Cashea => "cashea",
             Self::Transfer => "transfer",
             Self::Cash => "cash",
+            Self::CreditCard => "credit_card",
             Self::Other => "other",
         }
     }
@@ -30,6 +32,7 @@ impl PaymentMethod {
             Self::Cashea => "Cashea",
             Self::Transfer => "Transferencia",
             Self::Cash => "Efectivo",
+            Self::CreditCard => "Tarjeta de crédito",
             Self::Other => "Otro",
         }
     }
@@ -39,6 +42,7 @@ impl PaymentMethod {
             "cashea" => Self::Cashea,
             "transfer" => Self::Transfer,
             "cash" => Self::Cash,
+            "credit_card" | "creditcard" => Self::CreditCard,
             _ => Self::Other,
         }
     }
@@ -85,6 +89,10 @@ pub struct NewRecurringPayment {
     pub due_date: Option<NaiveDate>,
     pub method: PaymentMethod,
     pub note: Option<String>,
+    /// Día de cierre de estado de cuenta (tarjeta de crédito). 0/None = no aplica.
+    pub statement_closing_day: Option<u8>,
+    /// Día límite de pago (tarjeta de crédito). 0/None = no aplica.
+    pub payment_due_day: Option<u8>,
 }
 
 impl NewRecurringPayment {
@@ -96,7 +104,19 @@ impl NewRecurringPayment {
         if self.due_date.is_none() && !(1..=31).contains(&self.due_day) {
             return Err(DomainError::InvalidDueDay);
         }
-        if self.amount.cents() <= 0 {
+        if self.amount.cents() < 0 {
+            return Err(DomainError::InvalidAmount);
+        }
+        if self.method == PaymentMethod::CreditCard {
+            let closing = self.statement_closing_day.unwrap_or(0);
+            let due = self.payment_due_day.unwrap_or(0);
+            if !(1..=31).contains(&closing) || !(1..=31).contains(&due) {
+                return Err(DomainError::InvalidDueDay);
+            }
+            if self.due_date.is_some() {
+                return Err(DomainError::InvalidDueDay);
+            }
+        } else if self.amount.cents() <= 0 {
             return Err(DomainError::InvalidAmount);
         }
         if self
@@ -123,6 +143,8 @@ pub struct RecurringPayment {
     pub note: Option<String>,
     pub last_paid_period: Option<(i32, u32)>,
     pub is_active: bool,
+    pub statement_closing_day: Option<u8>,
+    pub payment_due_day: Option<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,6 +209,8 @@ mod tests {
             note: None,
             last_paid_period: None,
             is_active: true,
+            statement_closing_day: None,
+            payment_due_day: None,
         }
     }
 
@@ -201,6 +225,8 @@ mod tests {
             due_date: None,
             method: PaymentMethod::Other,
             note: None,
+            statement_closing_day: None,
+            payment_due_day: None,
         };
         assert_eq!(new.validate(), Ok(()));
         new.due_day = 32;
@@ -208,6 +234,25 @@ mod tests {
         new.due_day = 15;
         new.name = " ".into();
         assert_eq!(new.validate(), Err(DomainError::InvalidPaymentName));
+    }
+
+    #[test]
+    fn validates_credit_card_fields() {
+        let mut new = NewRecurringPayment {
+            kind: RecurringKind::Payment,
+            name: "Visa".into(),
+            amount: Money::from_cents(0, Currency::new("USD").unwrap()),
+            category_id: CategoryId::new(1),
+            due_day: 15,
+            due_date: None,
+            method: PaymentMethod::CreditCard,
+            note: None,
+            statement_closing_day: Some(20),
+            payment_due_day: Some(15),
+        };
+        assert_eq!(new.validate(), Ok(()));
+        new.statement_closing_day = Some(0);
+        assert_eq!(new.validate(), Err(DomainError::InvalidDueDay));
     }
 
     #[test]

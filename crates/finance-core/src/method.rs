@@ -67,6 +67,7 @@ impl MovementMethod {
             PaymentMethod::Cash => Self::Cash,
             PaymentMethod::Transfer => Self::BankTransfer,
             PaymentMethod::Cashea => Self::ExternalPage,
+            PaymentMethod::CreditCard => Self::BankTransfer,
             PaymentMethod::Other => Self::Other,
         }
     }

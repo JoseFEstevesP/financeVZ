@@ -85,6 +85,8 @@ pub fn recurring_from_row(row: &Row<'_>) -> Result<RecurringPayment, Error> {
         .and_then(|value| NaiveDate::parse_from_str(&value, "%Y-%m-%d").ok());
     let method = PaymentMethod::parse(&row.get::<_, String>("payment_method")?);
 
+    let closing: Option<i64> = row.get("statement_closing_day")?;
+    let payment_due: Option<i64> = row.get("payment_due_day")?;
     Ok(RecurringPayment {
         id: RecurringPaymentId::new(row.get("id")?),
         kind: RecurringKind::parse(&row.get::<_, String>("kind")?),
@@ -97,5 +99,7 @@ pub fn recurring_from_row(row: &Row<'_>) -> Result<RecurringPayment, Error> {
         note: row.get("note")?,
         last_paid_period,
         is_active: row.get::<_, i64>("is_active")? == 1,
+        statement_closing_day: closing.filter(|d| *d > 0).map(|d| d as u8),
+        payment_due_day: payment_due.filter(|d| *d > 0).map(|d| d as u8),
     })
 }
