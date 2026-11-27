@@ -23,7 +23,7 @@ Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Polí
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.40: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.40.apk
+- APK firmado 0.1.41: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.41.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
@@ -93,7 +93,7 @@ El script **no instala** el APK: instala `updates/financevz.apk` en el dispositi
 
 ## Actualizaciones
 
-La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.40` → código `36`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
+La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.41` → código `36`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
 
 Si el campo **URL del servidor** está vacío se usa GitHub. Si algún día se guardó una URL local, bórrala y pulsa **Buscar y descargar** para volver a GitHub.
 
@@ -164,7 +164,7 @@ Pulsa el engranaje de la cabecera. Ahí están:
 - **Seguridad**: activar/quitar el PIN de 4 dígitos (guardado como SHA-256, sin opción de recuperación: anótalo) y guardar la huella del teléfono. La huella usa `BiometricPrompt` del sistema y requiere tener PIN activo como respaldo; si el teléfono no tiene huella configurada, se sigue entrando con PIN.
 - **Tamaño de texto**: pequeño, normal o grande.
 
-Las fechas visibles usan el formato venezolano `dd/mm/aaaa`; los campos nativos de fecha siguen devolviendo ISO internamente.
+Las fechas visibles usan el formato venezolano `dd/mm/aaaa` y las horas el formato de 12 horas con `a. m.`/`p. m.`; los campos nativos de fecha siguen devolviendo ISO internamente.
 
 ## Verificación
 

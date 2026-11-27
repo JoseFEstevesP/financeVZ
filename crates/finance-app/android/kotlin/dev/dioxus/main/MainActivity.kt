@@ -1,10 +1,12 @@
 package dev.dioxus.main
 
+import android.Manifest
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -15,6 +17,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
@@ -32,6 +35,15 @@ class MainActivity : WryActivity() {
         super.onCreate(savedInstanceState)
         applyTheme(prefs.getBoolean("light_theme", false))
         restorePendingDownload()
+        requestNotificationPermissionIfNeeded()
+        UpdateCheckWorker.schedule(this)
+        handleOpenSettingsIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleOpenSettingsIntent(intent)
     }
 
     override fun onResume() {
@@ -68,6 +80,28 @@ class MainActivity : WryActivity() {
         webView = view
         view.settings.textZoom = 100
         view.addJavascriptInterface(FinanzasVZBridge(), "FinanzasVZBiometric")
+        if (intent?.getBooleanExtra("open_settings", false) == true) {
+            view.postDelayed({ notifyOpenSettings() }, 700)
+        }
+    }
+
+    private fun handleOpenSettingsIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("open_settings", false) == true) {
+            webView?.postDelayed({ notifyOpenSettings() }, 300)
+        }
+    }
+
+    private fun notifyOpenSettings() {
+        webView?.post {
+            val payload = JSONObject().put("kind", "open_settings")
+            webView?.evaluateJavascript("window.__fvzBridge && window.__fvzBridge.send($payload)", null)
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2201)
     }
 
     private fun applyTheme(light: Boolean) {

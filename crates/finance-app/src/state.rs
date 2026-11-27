@@ -3,7 +3,7 @@ use std::{
     time::Duration as StdDuration,
 };
 
-use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate, Timelike, Utc};
 use finance_core::{
     ActivityEntry, ActivityKind, Backup, Category, CategoryId, Currency, Expense, ExpenseId,
     Income, IncomeId, Money, MovementMethod, NewExpense, NewIncome, NewRecurringPayment,
@@ -28,6 +28,7 @@ const THEME_SETTING: &str = "theme";
 const BIOMETRIC_SETTING: &str = "biometric_enabled";
 const AUTO_BACKUP_INTERVAL_SETTING: &str = "auto_backup_hours";
 const LAST_AUTO_BACKUP_SETTING: &str = "last_auto_backup_at";
+const UPDATE_AVAILABLE_SETTING: &str = "update_available_version";
 
 pub fn sha256_hex(value: &str) -> String {
     let digest = Sha256::digest(value.as_bytes());
@@ -39,13 +40,21 @@ pub fn format_date(day: NaiveDate) -> String {
     day.format("%d/%m/%Y").to_string()
 }
 
+fn format_clock<T: Timelike>(time: &T) -> String {
+    let (is_pm, hour) = time.hour12();
+    let period = if is_pm { "p. m." } else { "a. m." };
+    format!("{}:{:02} {}", hour, time.minute(), period)
+}
+
 fn format_timestamp(seconds: i64) -> String {
     DateTime::from_timestamp(seconds, 0)
         .map(|moment| {
-            moment
-                .with_timezone(&Local)
-                .format("%d/%m/%Y %H:%M")
-                .to_string()
+            let local = moment.with_timezone(&Local);
+            format!(
+                "{} {}",
+                format_date(local.date_naive()),
+                format_clock(&local)
+            )
         })
         .unwrap_or_else(|| "desconocida".to_owned())
 }
@@ -55,7 +64,7 @@ pub fn format_activity_moment(moment: DateTime<Utc>) -> String {
     format!(
         "{} {}",
         format_date(local.date_naive()),
-        local.format("%H:%M")
+        format_clock(&local)
     )
 }
 
@@ -178,6 +187,7 @@ pub struct AppState {
     pub toast: Option<String>,
     pub update_url: String,
     pub update_status: Option<String>,
+    pub update_available: Option<String>,
     pub editing_expense: Option<ExpenseId>,
     pub editing_income: Option<IncomeId>,
     pub budgets: Vec<(CategoryId, i64)>,
@@ -256,6 +266,7 @@ impl AppState {
             toast: None,
             update_url: String::new(),
             update_status: None,
+            update_available: None,
             editing_expense: None,
             editing_income: None,
             budgets: Vec::new(),
@@ -306,6 +317,11 @@ impl AppState {
                 .flatten()
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(12);
+            state.update_available = repo
+                .get_setting(UPDATE_AVAILABLE_SETTING)
+                .ok()
+                .flatten()
+                .filter(|v| !v.is_empty());
         }
         state.locked = state.pin_hash.is_some();
         state.seed_categories();
@@ -394,6 +410,11 @@ impl AppState {
         {
             self.update_url = url;
         }
+        self.update_available = repo
+            .get_setting(UPDATE_AVAILABLE_SETTING)
+            .ok()
+            .flatten()
+            .filter(|v| !v.is_empty());
         let from = NaiveDate::from_ymd_opt(2000, 1, 1).expect("valid date");
         let to = NaiveDate::from_ymd_opt(2100, 12, 31).expect("valid date");
         if let Ok(expenses) = repo.expenses_between(from, to) {
@@ -2176,6 +2197,26 @@ pub fn start_auto_backup_loop(repo: Arc<Mutex<SqliteRepository>>) {
     });
 }
 
+fn check_update_available(repo: &SqliteRepository) -> Option<String> {
+    let source = repo
+        .get_setting(UPDATE_URL_SETTING)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let source = if source.trim().is_empty() {
+        UpdateSource::GitHub
+    } else {
+        UpdateSource::Local(source.trim().trim_end_matches('/').to_owned())
+    };
+    let resolved = platform::resolve_update(&source).ok()?;
+    let (local_code, _) = platform::local_version();
+    if resolved.info.version_code > local_code {
+        Some(resolved.info.version_name)
+    } else {
+        None
+    }
+}
+
 /// Actualiza la tasa en segundo plano y la persiste; la UI la recoge en el próximo refresh.
 pub fn start_rate_refresh_loop(repo: Arc<Mutex<SqliteRepository>>) {
     std::thread::spawn(move || {
@@ -2188,6 +2229,32 @@ pub fn start_rate_refresh_loop(repo: Arc<Mutex<SqliteRepository>>) {
                     let _ = guard.set_rate_for_day(today, rate, source);
                 }
             }
+        }
+    });
+}
+
+fn store_update_available(repo: &SqliteRepository, available: Option<String>) {
+    let _ = repo.set_setting(UPDATE_AVAILABLE_SETTING, available.as_deref().unwrap_or(""));
+}
+
+/// Revisa periódicamente si hay una versión nueva publicada.
+pub fn start_update_check_loop(repo: Arc<Mutex<SqliteRepository>>) {
+    std::thread::spawn(move || {
+        loop {
+            let available = repo.lock().ok().and_then(|g| check_update_available(&g));
+            if let Ok(guard) = repo.lock() {
+                store_update_available(&guard, available);
+            }
+            std::thread::sleep(StdDuration::from_secs(6 * 60 * 60));
+        }
+    });
+}
+
+pub fn check_update_on_start(repo: Arc<Mutex<SqliteRepository>>) {
+    std::thread::spawn(move || {
+        let available = repo.lock().ok().and_then(|g| check_update_available(&g));
+        if let Ok(guard) = repo.lock() {
+            store_update_available(&guard, available);
         }
     });
 }
@@ -2233,6 +2300,20 @@ mod tests {
     fn formats_visible_dates_for_venezuela() {
         let day = NaiveDate::from_ymd_opt(2026, 11, 5).expect("fecha válida");
         assert_eq!(format_date(day), "05/11/2026");
+    }
+
+    #[test]
+    fn formats_visible_clock_in_twelve_hour_style() {
+        let cases = [
+            (0, 5, "12:05 a. m."),
+            (9, 5, "9:05 a. m."),
+            (12, 0, "12:00 p. m."),
+            (22, 31, "10:31 p. m."),
+        ];
+        for (hour, minute, expected) in cases {
+            let time = chrono::NaiveTime::from_hms_opt(hour, minute, 0).expect("hora válida");
+            assert_eq!(format_clock(&time), expected);
+        }
     }
 
     #[test]

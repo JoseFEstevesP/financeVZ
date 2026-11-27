@@ -21,6 +21,8 @@ enum BridgeMessage {
     },
     #[serde(rename = "download_result")]
     DownloadResult { status: String, message: String },
+    #[serde(rename = "open_settings")]
+    OpenSettings,
 }
 
 pub fn use_bridge(mut state: Signal<AppState>) {
@@ -38,6 +40,9 @@ pub fn use_bridge(mut state: Signal<AppState>) {
                     } => state.write().finish_biometric(&action, ok, &message),
                     BridgeMessage::DownloadResult { status, message } => {
                         state.write().finish_background_download(&status, &message);
+                    }
+                    BridgeMessage::OpenSettings => {
+                        state.write().set_view(crate::state::View::Settings);
                     }
                     BridgeMessage::Evidence { name, data } => {
                         if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(data) {

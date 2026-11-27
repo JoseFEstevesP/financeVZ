@@ -31,6 +31,9 @@ pub fn run() {
     state::start_auto_backup_loop(backup_repo);
     let rate_repo = state.repo.clone();
     state::start_rate_refresh_loop(rate_repo);
+    let update_repo = state.repo.clone();
+    state::start_update_check_loop(update_repo.clone());
+    state::check_update_on_start(update_repo);
     state.update_rate_from_api();
     let _ = APP_STATE.set(state);
     dioxus::launch(App);
@@ -73,6 +76,7 @@ fn App() -> Element {
     let biometric_unlock = snapshot.biometric_enabled;
     let evidence = snapshot.evidence_viewer.clone();
     let pending_delete_message = snapshot.pending_delete_message();
+    let update_available = snapshot.update_available.clone();
     let shell_class = if snapshot.is_light_theme() {
         "shell theme-light"
     } else {
@@ -124,7 +128,10 @@ fn App() -> Element {
                     svg { class: "brand-mark", view_box: "0 0 256 256",
                         path { d: BRAND_SYMBOL_PATH, fill: "currentColor" }
                     }
-                    h1 { "finanzasVZ" }
+                    div { class: "brand-copy",
+                        h1 { "finanzasVZ" }
+                        small { class: "muted brand-version", "v{platform::local_version().1}" }
+                    }
                 }
                 button {
                     class: "settings-button",
@@ -134,6 +141,15 @@ fn App() -> Element {
                 }
             }
             main { class: "content", {content} }
+            if let Some(version) = update_available {
+                if view != View::Settings {
+                    button {
+                        class: "update-banner",
+                        onclick: move |_| app_state.write().set_view(View::Settings),
+                        "Nueva versión disponible: v{version}. Toca para actualizar."
+                    }
+                }
+            }
             if let Some(message) = toast {
                 div { class: "toast", role: "status", "{message}" }
             }
@@ -212,7 +228,6 @@ fn App() -> Element {
                 Tab { target: View::Reports, label: "Reportes", icon: "reports", active: view == View::Reports, app_state }
                 Tab { target: View::Categories, label: "Categorías", icon: "categories", active: view == View::Categories, app_state }
                 Tab { target: View::Payments, label: "Pagos", icon: "payments", active: view == View::Payments, app_state }
-                Tab { target: View::Update, label: "Actualizar", icon: "update", active: view == View::Update, app_state }
             }
         }
     }
@@ -261,6 +276,8 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .brand:hover { opacity: .85; }
 .brand-mark { width: 1.75rem; height: 1.75rem; color: var(--accent); flex-shrink: 0; }
 .topbar h1 { font-size: 1.25rem; margin: 0; letter-spacing: .03125rem; }
+.brand-copy { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-version { font-size: .72rem; font-weight: 600; opacity: .85; }
 .settings-button { display: grid; place-items: center; width: 2.25rem; height: 2.25rem;
   padding: 0; background: var(--chip-bg); border: 1px solid var(--input-border);
   border-radius: .625rem; cursor: pointer; }
@@ -329,6 +346,10 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   transform: translateX(-50%); z-index: 20; background: var(--toast-bg); color: var(--toast-text);
   border: 1px solid var(--toast-border); border-radius: 999px; padding: .6875rem 1.25rem; font-size: .875rem;
   font-weight: 600; box-shadow: 0 .625rem 1.875rem var(--shadow); white-space: nowrap; }
+.update-banner { position: fixed; left: 1rem; right: 1rem; bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  z-index: 19; background: var(--chip-active-bg); color: var(--link); border: 1px solid var(--link-border);
+  border-radius: .875rem; padding: .75rem 1rem; font-size: .8125rem; font-weight: 600; text-align: center;
+  box-shadow: 0 .625rem 1.875rem var(--shadow); cursor: pointer; }
 .bottom-nav { display: flex; border-top: 1px solid var(--nav-border); background: var(--nav-bg);
   padding-bottom: env(safe-area-inset-bottom); }
 .file-drop { position: relative; display: flex; align-items: center; gap: .75rem;

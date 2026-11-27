@@ -3,6 +3,7 @@ use dioxus::prelude::*;
 use crate::{
     bridge,
     state::{AppState, View},
+    views::update::Update,
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -215,6 +216,8 @@ pub fn Settings(props: SettingsProps) -> Element {
                     }
                 }
             }
+
+            Update { state: app_state }
 
             if let Some(message) = feedback {
                 p { class: "feedback", "{message}" }

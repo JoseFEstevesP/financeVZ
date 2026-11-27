@@ -2,6 +2,12 @@
 
 Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
+## [Unreleased]
+
+### Cambiado
+
+- Las horas visibles en el historial de actividad y en el estado de la copia automática usan formato de 12 horas con `a. m.`/`p. m.` en lugar de 24.
+
 ## [0.1.40] - 2026-11-26
 
 ### Corregido

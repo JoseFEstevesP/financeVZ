@@ -16,7 +16,7 @@ cd "$ROOT"
 
 GEN="$ROOT/target/dx/finance-app/debug/android/app"
 ANDROID_RES="$ROOT/crates/finance-app/android/res/xml"
-ANDROID_KOTLIN="$ROOT/crates/finance-app/android/kotlin/dev/dioxus/main/MainActivity.kt"
+ANDROID_KOTLIN_DIR="$ROOT/crates/finance-app/android/kotlin/dev/dioxus/main"
 VERSION_FILE="$ROOT/crates/finance-app/android/version-code.txt"
 UPDATES="$ROOT/updates"
 
@@ -28,6 +28,7 @@ VERSION_NAME="0.1.$CODE"
 mkdir -p "$GEN/app/src/main/res/xml"
 cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
 cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
 
 bash scripts/install-brand-icon.sh "$GEN"
 dx build --android -p finance-app --target "$TARGET"
@@ -41,7 +42,10 @@ bash scripts/patch-android-gradle.sh "$GRADLE"
 
 cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
 cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
-cp "$ANDROID_KOTLIN" "$GEN/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+mkdir -p "$GEN/app/src/main/kotlin/dev/dioxus/main"
+cp "$ANDROID_KOTLIN_DIR"/*.kt "$GEN/app/src/main/kotlin/dev/dioxus/main/"
+cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
 bash scripts/install-brand-icon.sh "$GEN"
 (cd "$GEN" && ./gradlew assembleDebug)
 

@@ -134,13 +134,12 @@ pub fn Payments(props: PaymentsProps) -> Element {
                 None => format!("día {}", payment.due_day),
             };
             let mut detail = vec![payment.method.label().to_owned(), schedule];
-            if payment.method == PaymentMethod::CreditCard {
-                if let (Some(close), Some(due)) =
+            if payment.method == PaymentMethod::CreditCard
+                && let (Some(close), Some(due)) =
                     (payment.statement_closing_day, payment.payment_due_day)
-                {
-                    detail.push(format!("corte día {close}"));
-                    detail.push(format!("límite día {due}"));
-                }
+            {
+                detail.push(format!("corte día {close}"));
+                detail.push(format!("límite día {due}"));
             }
             if let Some(note) = payment.note.as_deref()
                 && !note.trim().is_empty()
