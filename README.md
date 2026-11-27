@@ -93,7 +93,7 @@ El script **no instala** el APK: instala `updates/financevz.apk` en el dispositi
 
 ## Actualizaciones
 
-La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.41` → código `36`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Actualizar**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
+La app consulta por defecto `https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest`. De la respuesta toma el tag (`v0.1.41` → código `36`), el asset `.apk`, su `digest` SHA-256 y la URL de descarga. En **Configuración > Actualizar app**, pulsa **Buscar y descargar** y después **Instalar APK descargado**: la instalación nunca se lanza automáticamente. Solo hace falta internet; la API pública de GitHub admite 60 peticiones por hora y IP.
 
 Si el campo **URL del servidor** está vacío se usa GitHub. Si algún día se guardó una URL local, bórrala y pulsa **Buscar y descargar** para volver a GitHub.
 
@@ -107,7 +107,7 @@ python3 scripts/serve-update.sh        # o scripts/serve-update.sh 8000
 
 El script sirve `updates/` por HTTP en `0.0.0.0`, puerto `8000` por defecto, e imprime la IP local. Abre el puerto en el firewall si hace falta.
 
-En la app, entra a **Actualizar**, abre **Usar un servidor local (opciones avanzadas)** y escribe solo la raíz del servidor, por ejemplo:
+En la app, entra a **Configuración > Actualizar app**, abre **Usar un servidor local (opciones avanzadas)** y escribe solo la raíz del servidor, por ejemplo:
 
 ```text
 http://<IP-del-PC>:8000
