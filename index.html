@@ -66,6 +66,9 @@
 	.card h3 { margin:0 0 6px; font-size:16px; color:var(--accent); }
 	.card p { margin:0; color:var(--muted); font-size:14px; }
 
+	.video-wrap { max-width:360px; margin:0 auto 28px; }
+	.video-wrap iframe { width:100%; aspect-ratio:9/16; border:1px solid var(--line); border-radius:14px; display:block; background:var(--panel-2); }
+	.video-wrap p { text-align:center; color:var(--muted); font-size:13px; margin:10px 0 0; }
 	.shots { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
 	.shots figure { margin:0; text-align:center; }
 	.shots img {
@@ -143,6 +146,10 @@
 
 		<section id="capturas">
 			<h2>Así se ve</h2>
+			<div class="video-wrap">
+				<iframe src="https://www.youtube-nocookie.com/embed/Kl7jhOVCR4Y" title="financeVZ - Video promocional" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>
+				<p><a href="https://youtube.com/shorts/Kl7jhOVCR4Y" target="_blank" rel="noopener">Ver en YouTube</a></p>
+			</div>
 			<div class="shots">
 				<figure><img src="capturas/01-inicio.webp" alt="Inicio"><figcaption>Inicio</figcaption></figure>
 				<figure><img src="capturas/02-inicio-detalle.webp" alt="Inicio desplazado"><figcaption>Inicio · detalle</figcaption></figure>
