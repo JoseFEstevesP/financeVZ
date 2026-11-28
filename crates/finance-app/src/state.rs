@@ -531,7 +531,11 @@ impl AppState {
 
     #[cfg(feature = "self-update")]
     pub fn prepare_update(&mut self) -> Result<UpdateSource, String> {
-        let base = self.update_url.trim().trim_end_matches('/').to_owned();
+        let base = if self.update_url.trim().is_empty() {
+            String::new()
+        } else {
+            platform::validate_update_base_url(&self.update_url)?
+        };
         if let Ok(repo) = self.repo.lock() {
             let _ = repo.set_setting(UPDATE_URL_SETTING, &base);
         }
@@ -565,10 +569,9 @@ impl AppState {
         if base.is_empty() {
             return Ok(UpdateSource::GitHub);
         }
-        if !(base.starts_with("http://") || base.starts_with("https://")) {
-            return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
-        }
-        Ok(UpdateSource::Local(base))
+        Ok(UpdateSource::Local(platform::validate_update_base_url(
+            &self.update_url,
+        )?))
     }
 
     #[cfg(feature = "self-update")]
@@ -2309,6 +2312,9 @@ mod tests {
             state.prepare_update().unwrap(),
             UpdateSource::Local("http://192.168.0.10:8000".into())
         );
+
+        state.set_update_url("http://example.com:8000".into());
+        assert!(state.prepare_update().is_err());
 
         state.set_update_url(String::new());
         assert_eq!(state.prepare_update().unwrap(), UpdateSource::GitHub);

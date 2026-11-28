@@ -8,6 +8,12 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 - Las horas visibles en el historial de actividad y en el estado de la copia automática usan formato de 12 horas con `a. m.`/`p. m.` en lugar de 24.
 
+### Corregido
+
+- La política de privacidad enumera ahora DolarAPI, BCV y GitHub Releases, que son las únicas conexiones de la app.
+- DolarAPI se consulta con verificación TLS normal; el workaround de certificados del BCV queda aislado.
+- El actualizador solo acepta URLs `http://` de la red local (localhost, `127.x`, `10.x`, `172.16-31.x` o `192.168.x`); para Internet exige `https://`.
+
 ## [0.1.40] - 2026-11-26
 
 ### Corregido

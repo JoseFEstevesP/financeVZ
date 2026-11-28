@@ -66,15 +66,19 @@ fn fetch_rate_from_bcv(agent: &ureq::Agent) -> Option<i64> {
 }
 
 pub fn fetch_exchange_rate() -> Option<(i64, &'static str)> {
-    let agent = ureq::Agent::config_builder()
+    let secure_agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
-        // El BCV sirve una cadena de certificados incompleta.
+        .build()
+        .new_agent();
+    let bcv_agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(15)))
+        // El BCV sirve una cadena de certificados incompleta; se aísla aquí su workaround.
         .tls_config(TlsConfig::builder().disable_verification(true).build())
         .build()
         .new_agent();
-    fetch_rate_from_dolarapi(&agent)
+    fetch_rate_from_dolarapi(&secure_agent)
         .map(|rate| (rate, "dolarapi"))
-        .or_else(|| fetch_rate_from_bcv(&agent).map(|rate| (rate, "bcv")))
+        .or_else(|| fetch_rate_from_bcv(&bcv_agent).map(|rate| (rate, "bcv")))
 }
 
 #[cfg(feature = "self-update")]
@@ -566,15 +570,78 @@ fn fetch_github_release() -> Result<ResolvedUpdate, String> {
 }
 
 #[cfg(feature = "self-update")]
+fn is_private_http_host(host: &str) -> bool {
+    let host = host.to_ascii_lowercase();
+    if host == "localhost" || host == "[::1]" {
+        return true;
+    }
+    let parts = host.split('.').collect::<Vec<_>>();
+    let [a, b, c, d] = match parts.as_slice() {
+        [a, b, c, d] => [a, b, c, d],
+        _ => return false,
+    };
+    let (Ok(a), Ok(b), Ok(_c), Ok(_d)) = (
+        a.parse::<u8>(),
+        b.parse::<u8>(),
+        c.parse::<u8>(),
+        d.parse::<u8>(),
+    ) else {
+        return false;
+    };
+    a == 127
+        || a == 10
+        || (a == 172 && (16..=31).contains(&b))
+        || (a == 192 && b == 168)
+        || (a == 169 && b == 254)
+}
+
+#[cfg(feature = "self-update")]
+pub fn validate_update_base_url(value: &str) -> Result<String, String> {
+    let base = value.trim().trim_end_matches('/');
+    let incomplete = "Escribe la URL completa, por ejemplo http://192.168.0.10:8000";
+    if let Some(rest) = base.strip_prefix("https://") {
+        if rest.split('/').next().unwrap_or("").is_empty() {
+            return Err(incomplete.into());
+        }
+        return Ok(base.to_owned());
+    }
+    let Some(rest) = base.strip_prefix("http://") else {
+        return Err(incomplete.into());
+    };
+    let authority = rest.split('/').next().unwrap_or("");
+    if authority.is_empty() || authority.contains('@') {
+        return Err("La URL local no puede incluir usuario ni contraseña".into());
+    }
+    let host = if authority.starts_with('[') {
+        authority
+            .split_once(']')
+            .map(|(host, _)| format!("{host}]"))
+            .unwrap_or_else(|| authority.to_owned())
+    } else {
+        authority.rsplit_once(':').map_or_else(
+            || authority.to_owned(),
+            |(host, port)| {
+                if port.is_empty() || port.bytes().all(|byte| byte.is_ascii_digit()) {
+                    host.to_owned()
+                } else {
+                    authority.to_owned()
+                }
+            },
+        )
+    };
+    if !is_private_http_host(&host) {
+        return Err("Las URL http:// solo se permiten en la red local (localhost, 127.x, 10.x, 172.16-31.x, 192.168.x o 169.254.x). Usa https:// para Internet.".into());
+    }
+    Ok(base.to_owned())
+}
+
+#[cfg(feature = "self-update")]
 pub fn resolve_update(source: &UpdateSource) -> Result<ResolvedUpdate, String> {
     match source {
         UpdateSource::GitHub => fetch_github_release(),
         UpdateSource::Local(base_url) => {
-            let base = base_url.trim().trim_end_matches('/');
-            if !(base.starts_with("http://") || base.starts_with("https://")) {
-                return Err("Escribe la URL completa, por ejemplo http://192.168.0.10:8000".into());
-            }
-            let info = fetch_update_info(base)?;
+            let base = validate_update_base_url(base_url)?;
+            let info = fetch_update_info(&base)?;
             let filename = Path::new(&info.apk)
                 .file_name()
                 .and_then(|value| value.to_str())
@@ -975,5 +1042,20 @@ mod tests {
     fn rejects_local_update_source_without_scheme() {
         assert!(resolve_update(&UpdateSource::Local("192.168.0.10:8000".into())).is_err());
         assert_eq!(UpdateSource::GitHub, UpdateSource::GitHub);
+    }
+
+    #[cfg(feature = "self-update")]
+    #[test]
+    fn validates_local_update_urls() {
+        assert_eq!(
+            validate_update_base_url("http://192.168.0.10:8000/").unwrap(),
+            "http://192.168.0.10:8000"
+        );
+        assert!(validate_update_base_url("http://127.0.0.1:8000").is_ok());
+        assert!(validate_update_base_url("http://10.0.0.5:8000").is_ok());
+        assert!(validate_update_base_url("https://example.com/updates").is_ok());
+        assert!(validate_update_base_url("http://example.com:8000").is_err());
+        assert!(validate_update_base_url("http://192.168.0.10@evil.com").is_err());
+        assert!(validate_update_base_url("ftp://192.168.0.10").is_err());
     }
 }

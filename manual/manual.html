@@ -277,7 +277,7 @@
 		<li>En la app, despliega <b>Usar un servidor local (opciones avanzadas)</b> y escribe solo la raíz, por ejemplo <code>http://&lt;IP-del-PC&gt;:8000</code>. No añadas <code>/update.json</code> ni el nombre del APK. Para volver a GitHub, borra el campo y pulsa <b>Buscar y descargar</b>.</li>
 		<li>El servidor debe publicar un <code>update.json</code> con <code>version_code</code>, <code>version_name</code>, <code>apk</code> y <code>sha256</code>. El código debe ser mayor que el instalado.</li>
 	</ol>
-	<div class="prereq-box"><strong>Requisitos del modo local:</strong> móvil y PC en la misma Wi-Fi, puerto abierto en el firewall si hace falta. El servidor usa HTTP, así que úsalo solo en una red de confianza.</div>
+	<div class="prereq-box"><strong>Requisitos del modo local:</strong> móvil y PC en la misma Wi-Fi, puerto abierto en el firewall si hace falta. El servidor usa HTTP, así que úsalo solo en una red de confianza. La app solo acepta URL <code>http://</code> de la red local (<code>localhost</code>, <code>127.x</code>, <code>10.x</code>, <code>172.16-31.x</code>, <code>192.168.x</code> o <code>169.254.x</code>); para cualquier otra dirección usa <code>https://</code>.</div>
 	<div class="tip-box"><strong>Si falla la instalación:</strong> casi siempre es por cambio de firma (debug → release) o por no haber autorizado la instalación de aplicaciones desconocidas. Desinstala la versión anterior y vuelve a intentarlo.</div>
 </section>
 

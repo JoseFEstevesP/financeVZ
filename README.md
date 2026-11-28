@@ -113,7 +113,7 @@ En la app, entra a **Configuración > Actualizar app**, abre **Usar un servidor 
 http://<IP-del-PC>:8000
 ```
 
-No escribas `/update.json` ni el nombre del APK: la app añade esas rutas sola. La URL queda guardada en la base de datos. Pulsa **Buscar y descargar** y después **Instalar APK descargado**; la instalación ya no es automática.
+No escribas `/update.json` ni el nombre del APK: la app añade esas rutas sola. La URL queda guardada en la base de datos. Las URL `http://` solo se aceptan en la red local (`localhost`, `127.x`, `10.x`, `172.16-31.x`, `192.168.x` o `169.254.x`); para cualquier otra dirección usa `https://`. Pulsa **Buscar y descargar** y después **Instalar APK descargado**; la instalación ya no es automática.
 
 `updates/update.json` tiene este formato:
 
