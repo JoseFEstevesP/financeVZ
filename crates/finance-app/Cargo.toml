@@ -13,9 +13,12 @@ name = "finance-app"
 path = "src/main.rs"
 
 [features]
-default = ["desktop"]
-desktop = ["dioxus/desktop"]
-mobile = ["dioxus/mobile"]
+default = ["desktop", "self-update"]
+desktop = ["dioxus/desktop", "self-update"]
+mobile = ["dioxus/mobile", "self-update"]
+# Permite compilar para F-Droid sin el actualizador propio:
+# cargo/dx ... --no-default-features --features mobile
+self-update = []
 
 [dependencies]
 base64 = "0.22"

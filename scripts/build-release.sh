@@ -32,6 +32,7 @@ ANDROID_RES="$ROOT/crates/finance-app/android/res/xml"
 ANDROID_KOTLIN_DIR="$ROOT/crates/finance-app/android/kotlin/dev/dioxus/main"
 VERSION_FILE="$ROOT/crates/finance-app/android/version-code.txt"
 UPDATES="$ROOT/updates"
+FDROID="${FINANCEVZ_FDROID:-0}"
 
 LAST_CODE="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
 [[ "$LAST_CODE" =~ ^[0-9]+$ ]] || LAST_CODE=1
@@ -39,23 +40,41 @@ CODE=$((LAST_CODE + 1))
 VERSION_NAME="0.1.$CODE"
 
 mkdir -p "$GEN/app/src/main/res/xml"
-cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
-cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
-cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+if [ "$FDROID" = "1" ]; then
+    cp "$ANDROID_RES/network_security_config.fdroid.xml" "$GEN/app/src/main/res/xml/network_security_config.xml"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.fdroid.xml" "$GEN/app/src/main/AndroidManifest.xml"
+else
+    cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+fi
 
-dx build --android -p finance-app --target "$TARGET"
+DX_FEATURES=""
+if [ "$FDROID" = "1" ]; then
+    DX_FEATURES="--no-default-features --features mobile"
+fi
+dx build --android -p finance-app --target "$TARGET" $DX_FEATURES
 
 GRADLE="$GEN/app/build.gradle.kts"
 APP_GRADLE="$GRADLE"
 sed -i -E "s/versionCode = [0-9]+/versionCode = $CODE/; s/versionName = \"[^\"]*\"/versionName = \"$VERSION_NAME\"/" "$APP_GRADLE"
-bash scripts/patch-android-gradle.sh "$APP_GRADLE"
+PATCH_ARGS="$APP_GRADLE"
+if [ "$FDROID" = "1" ]; then PATCH_ARGS="$APP_GRADLE fdroid"; fi
+bash scripts/patch-android-gradle.sh $PATCH_ARGS
 
-cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
-cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
-cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
-mkdir -p "$GEN/app/src/main/kotlin/dev/dioxus/main"
-cp "$ANDROID_KOTLIN_DIR"/*.kt "$GEN/app/src/main/kotlin/dev/dioxus/main/"
-cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+mkdir -p "$GEN/app/src/main/res/xml" "$GEN/app/src/main/kotlin/dev/dioxus/main"
+if [ "$FDROID" = "1" ]; then
+    cp "$ANDROID_RES/network_security_config.fdroid.xml" "$GEN/app/src/main/res/xml/network_security_config.xml"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.fdroid.xml" "$GEN/app/src/main/AndroidManifest.xml"
+    cp "$ANDROID_KOTLIN_DIR/MainActivity.fdroid.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+    cp "$ANDROID_KOTLIN_DIR/UpdateCheckWorker.fdroid.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/UpdateCheckWorker.kt"
+else
+    cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+    cp "$ANDROID_KOTLIN_DIR/MainActivity.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+    cp "$ANDROID_KOTLIN_DIR/UpdateCheckWorker.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/UpdateCheckWorker.kt"
+fi
 bash scripts/install-brand-icon.sh "$GEN"
 
 # El Gradle se regenera en cada dx build: inyectamos la firma leyendo secretos
@@ -94,14 +113,18 @@ PY
 
 APK="$GEN/app/build/outputs/apk/release/app-release.apk"
 [[ -f "$APK" ]] || { echo "No se generó el APK firmado: $APK" >&2; exit 1; }
-mkdir -p "$UPDATES"
-cp "$APK" "$UPDATES/financevz.apk"
-SHA256="$(sha256sum "$UPDATES/financevz.apk" | awk '{print $1}')"
-printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk", "sha256": "%s"}\n' \
-    "$CODE" "$VERSION_NAME" "$SHA256" > "$UPDATES/update.json"
-printf '%s\n' "$CODE" > "$VERSION_FILE"
-
-echo "APK firmado: $APK"
-echo "Copia de seguridad: $UPDATES/financevz.apk + $UPDATES/update.json"
-echo "Versión: $VERSION_NAME (código $CODE)"
-echo "Recuerda: desinstala la versión debug antes de instalar esta firma."
+if [ "$FDROID" != "1" ]; then
+    mkdir -p "$UPDATES"
+    cp "$APK" "$UPDATES/financevz.apk"
+    SHA256="$(sha256sum "$UPDATES/financevz.apk" | awk '{print $1}')"
+    printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk", "sha256": "%s"}\n' \
+        "$CODE" "$VERSION_NAME" "$SHA256" > "$UPDATES/update.json"
+    printf '%s\n' "$CODE" > "$VERSION_FILE"
+    echo "APK firmado: $APK"
+    echo "Copia de seguridad: $UPDATES/financevz.apk + $UPDATES/update.json"
+    echo "Versión: $VERSION_NAME (código $CODE)"
+    echo "Recuerda: desinstala la versión debug antes de instalar esta firma."
+else
+    echo "APK F-Droid firmado/listo: $APK"
+    echo "Versión: $VERSION_NAME (código $CODE)"
+fi

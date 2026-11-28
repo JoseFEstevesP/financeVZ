@@ -1,16 +1,21 @@
+#[cfg(feature = "self-update")]
+use std::io::Read;
 use std::{
-    io::{Read, Write},
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use chrono::Local;
 use serde::Deserialize;
+#[cfg(feature = "self-update")]
 use sha2::{Digest, Sha256};
+#[cfg(feature = "self-update")]
+use std::io::Write;
 use ureq::tls::TlsConfig;
 
 const BCV_URL: &str = "https://www.bcv.org.ve";
 const DOLARAPI_URL: &str = "https://ve.dolarapi.com/v1/dolares/oficial";
+#[cfg(feature = "self-update")]
 const GITHUB_RELEASES_URL: &str =
     "https://api.github.com/repos/JoseFEstevesP/financeVZ/releases/latest";
 
@@ -72,6 +77,7 @@ pub fn fetch_exchange_rate() -> Option<(i64, &'static str)> {
         .or_else(|| fetch_rate_from_bcv(&agent).map(|rate| (rate, "bcv")))
 }
 
+#[cfg(feature = "self-update")]
 #[derive(Deserialize, Clone)]
 pub struct UpdateInfo {
     #[serde(default, alias = "versionCode")]
@@ -84,18 +90,21 @@ pub struct UpdateInfo {
     pub sha256: Option<String>,
 }
 
+#[cfg(feature = "self-update")]
 fn default_apk_name() -> String {
     "financevz.apk".to_owned()
 }
 
 /// Origen de la actualización. GitHub es el predeterminado; el servidor local
 /// queda disponible como opción avanzada para pruebas.
+#[cfg(feature = "self-update")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpdateSource {
     GitHub,
     Local(String),
 }
 
+#[cfg(feature = "self-update")]
 #[derive(Deserialize)]
 struct GitHubRelease {
     tag_name: String,
@@ -103,6 +112,7 @@ struct GitHubRelease {
     assets: Vec<GitHubAsset>,
 }
 
+#[cfg(feature = "self-update")]
 #[derive(Deserialize)]
 struct GitHubAsset {
     name: String,
@@ -110,15 +120,18 @@ struct GitHubAsset {
     browser_download_url: String,
 }
 
+#[cfg(feature = "self-update")]
 pub struct ResolvedUpdate {
     pub info: UpdateInfo,
     pub apk_url: String,
 }
 
+#[cfg(feature = "self-update")]
 pub fn checksum_of(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+#[cfg(feature = "self-update")]
 fn expected_checksum(expected: Option<&str>) -> Result<&str, String> {
     let value = expected
         .map(str::trim)
@@ -135,6 +148,7 @@ fn expected_checksum(expected: Option<&str>) -> Result<&str, String> {
     Ok(value)
 }
 
+#[cfg(feature = "self-update")]
 fn checksum_matches(actual: &str, expected: Option<&str>) -> Result<(), String> {
     let expected = expected_checksum(expected)?;
     if actual.eq_ignore_ascii_case(expected) {
@@ -146,6 +160,7 @@ fn checksum_matches(actual: &str, expected: Option<&str>) -> Result<(), String> 
     }
 }
 
+#[cfg(feature = "self-update")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateProgress {
     Checking,
@@ -237,7 +252,7 @@ pub fn local_version() -> (i64, String) {
     android_local_version().unwrap_or((0, "desconocida".to_owned()))
 }
 
-#[cfg(target_os = "android")]
+#[cfg(all(feature = "self-update", target_os = "android"))]
 fn android_open_install_settings(
     env: &mut jni::JNIEnv,
     context: &jni::objects::JObject,
@@ -288,7 +303,7 @@ fn android_open_install_settings(
     Ok(())
 }
 
-#[cfg(target_os = "android")]
+#[cfg(all(feature = "self-update", target_os = "android"))]
 fn android_install_apk(path: &Path) -> Result<(), String> {
     use jni::objects::{JObject, JValue};
 
@@ -388,13 +403,13 @@ fn android_install_apk(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(target_os = "android")]
+#[cfg(feature = "self-update")]
 pub fn downloaded_apk_path() -> Option<PathBuf> {
     let path = app_files_dir().ok()?.join("updates").join("financevz.apk");
     path.is_file().then_some(path)
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(feature = "self-update"))]
 pub fn downloaded_apk_path() -> Option<PathBuf> {
     None
 }
@@ -405,23 +420,31 @@ pub fn cleanup_update_files() {
         return;
     };
     let dir = dir.join("updates");
-    let version_file = dir.join("version-code.txt");
-    let cached_version = std::fs::read_to_string(&version_file)
-        .ok()
-        .and_then(|value| value.trim().parse::<i64>().ok());
-    let (installed, _) = local_version();
-    let already_installed = cached_version
-        .map(|version| version <= installed)
-        .unwrap_or(true);
+    #[cfg(feature = "self-update")]
+    {
+        let version_file = dir.join("version-code.txt");
+        let cached_version = std::fs::read_to_string(&version_file)
+            .ok()
+            .and_then(|value| value.trim().parse::<i64>().ok());
+        let (installed, _) = local_version();
+        let already_installed = cached_version
+            .map(|version| version <= installed)
+            .unwrap_or(true);
 
-    if already_installed {
-        let _ = std::fs::remove_file(dir.join("financevz.apk"));
-        let _ = std::fs::remove_file(&version_file);
+        if already_installed {
+            let _ = std::fs::remove_file(dir.join("financevz.apk"));
+            let _ = std::fs::remove_file(&version_file);
+        }
+        let _ = std::fs::remove_file(dir.join("financevz.apk.part"));
     }
-    let _ = std::fs::remove_file(dir.join("financevz.apk.part"));
+    #[cfg(not(feature = "self-update"))]
+    {
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
 
 /// Abre el instalador con el APK que ya quedó guardado. Útil tras conceder el permiso.
+#[cfg(feature = "self-update")]
 pub fn install_downloaded_apk() -> Result<String, String> {
     #[cfg(target_os = "android")]
     {
@@ -436,6 +459,12 @@ pub fn install_downloaded_apk() -> Result<String, String> {
     }
 }
 
+#[cfg(not(feature = "self-update"))]
+pub fn install_downloaded_apk() -> Result<String, String> {
+    Err("Esta versión se actualiza desde la tienda donde la instalaste.".into())
+}
+
+#[cfg(feature = "self-update")]
 fn fetch_update_info(base: &str) -> Result<UpdateInfo, String> {
     let agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(10)))
@@ -451,6 +480,7 @@ fn fetch_update_info(base: &str) -> Result<UpdateInfo, String> {
         .map_err(|error| format!("update.json inválido: {error}"))
 }
 
+#[cfg(feature = "self-update")]
 fn version_from_tag(tag: &str) -> Result<(i64, String), String> {
     let name = tag
         .strip_prefix('v')
@@ -472,6 +502,7 @@ fn version_from_tag(tag: &str) -> Result<(i64, String), String> {
     Ok((code, name.to_owned()))
 }
 
+#[cfg(feature = "self-update")]
 fn github_release_from_json(body: &str) -> Result<ResolvedUpdate, String> {
     let release: GitHubRelease = serde_json::from_str(body)
         .map_err(|error| format!("respuesta de GitHub Releases inválida: {error}"))?;
@@ -511,6 +542,7 @@ fn github_release_from_json(body: &str) -> Result<ResolvedUpdate, String> {
     })
 }
 
+#[cfg(feature = "self-update")]
 fn fetch_github_release() -> Result<ResolvedUpdate, String> {
     let agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
@@ -533,6 +565,7 @@ fn fetch_github_release() -> Result<ResolvedUpdate, String> {
     github_release_from_json(&body)
 }
 
+#[cfg(feature = "self-update")]
 pub fn resolve_update(source: &UpdateSource) -> Result<ResolvedUpdate, String> {
     match source {
         UpdateSource::GitHub => fetch_github_release(),
@@ -557,6 +590,7 @@ pub fn resolve_update(source: &UpdateSource) -> Result<ResolvedUpdate, String> {
 
 /// Descarga el APK desde GitHub Releases o desde el servidor local. La instalación
 /// se hace después desde la UI, siempre mediante un clic del usuario.
+#[cfg(feature = "self-update")]
 pub fn download_update(
     source: &UpdateSource,
     progress: &(dyn Fn(UpdateProgress) + Send + Sync),
@@ -643,6 +677,7 @@ pub fn download_update(
 
 /// Descarga e instala. La UI usa `download_update` + `install_downloaded_apk` por separado
 /// para que `startActivity` se ejecute siempre en el hilo principal de Android.
+#[cfg(feature = "self-update")]
 pub fn install_update(
     source: &UpdateSource,
     progress: &(dyn Fn(UpdateProgress) + Send + Sync),
@@ -843,6 +878,7 @@ mod tests {
         assert_eq!(parse_dolarapi_rate(Some(f64::NAN)), None);
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn parses_update_json_in_both_formats() {
         let current: UpdateInfo = serde_json::from_str(
@@ -862,6 +898,7 @@ mod tests {
         assert_eq!(legacy.apk, "financevz.apk");
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn verifies_apk_checksum_before_installing() {
         let hash = checksum_of(b"apk de prueba");
@@ -881,6 +918,7 @@ mod tests {
         assert!(expected_checksum(with_checksum.sha256.as_deref()).is_ok());
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn rejects_manifest_without_checksum() {
         let current: UpdateInfo = serde_json::from_str(
@@ -896,6 +934,7 @@ mod tests {
         assert!(expected_checksum(legacy.sha256.as_deref()).is_err());
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn derives_version_from_github_tag() {
         assert_eq!(
@@ -908,6 +947,7 @@ mod tests {
         assert!(version_from_tag("v0.1.31.4").is_err());
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn parses_github_release_with_sha256_digest() {
         let body = r#"{"tag_name":"v0.1.31","assets":[{"name":"financevz-0.1.31.apk","digest":"sha256:9ff3d99b3bfabc08820f3044f135b8b9e47d75ae83e134bf5ad81019bb7ab137","browser_download_url":"https://github.com/JoseFEstevesP/financeVZ/releases/download/v0.1.31/financevz-0.1.31.apk"}]}"#;
@@ -919,6 +959,7 @@ mod tests {
         assert!(resolved.apk_url.ends_with("/financevz-0.1.31.apk"));
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn rejects_github_release_without_checksum_or_apk() {
         let without_digest = r#"{"tag_name":"v0.1.31","assets":[{"name":"financevz-0.1.31.apk","browser_download_url":"https://github.com/x.apk"}]}"#;
@@ -929,6 +970,7 @@ mod tests {
         assert!(github_release_from_json(no_apk).is_err());
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn rejects_local_update_source_without_scheme() {
         assert!(resolve_update(&UpdateSource::Local("192.168.0.10:8000".into())).is_err());

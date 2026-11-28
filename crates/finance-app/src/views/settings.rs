@@ -1,9 +1,10 @@
 use dioxus::prelude::*;
 
+#[cfg(feature = "self-update")]
+use crate::views::update::Update;
 use crate::{
     bridge,
     state::{AppState, View},
-    views::update::Update,
 };
 
 #[derive(Props, Clone, PartialEq)]
@@ -33,6 +34,18 @@ pub fn Settings(props: SettingsProps) -> Element {
         "Guarda tu huella del teléfono para entrar sin escribir el PIN."
     } else {
         "La huella necesita un PIN de respaldo: activa el PIN y luego guarda tu huella."
+    };
+
+    #[cfg(feature = "self-update")]
+    let update_section = rsx! { Update { state: app_state } };
+    #[cfg(not(feature = "self-update"))]
+    let update_section = rsx! {
+        div { class: "card",
+            h3 { "Actualizaciones" }
+            p { class: "muted",
+                "Esta versión se actualiza desde la tienda donde la instalaste."
+            }
+        }
     };
 
     rsx! {
@@ -217,7 +230,7 @@ pub fn Settings(props: SettingsProps) -> Element {
                 }
             }
 
-            Update { state: app_state }
+            {update_section}
 
             if let Some(message) = feedback {
                 p { class: "feedback", "{message}" }

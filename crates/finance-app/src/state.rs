@@ -14,13 +14,13 @@ use finance_core::{
 use finance_store::SqliteRepository;
 use sha2::{Digest, Sha256};
 
-use crate::{
-    bridge,
-    platform::{self, UpdateProgress, UpdateSource},
-};
+#[cfg(feature = "self-update")]
+use crate::platform::{UpdateProgress, UpdateSource};
+use crate::{bridge, platform};
 
 pub const DEFAULT_CURRENCY: &str = "USD";
 const RATE_SETTING: &str = "exchange_rate_cents";
+#[cfg(feature = "self-update")]
 const UPDATE_URL_SETTING: &str = "update_url";
 const PIN_HASH_SETTING: &str = "app_pin_hash";
 const TEXT_SCALE_SETTING: &str = "text_scale";
@@ -28,6 +28,7 @@ const THEME_SETTING: &str = "theme";
 const BIOMETRIC_SETTING: &str = "biometric_enabled";
 const AUTO_BACKUP_INTERVAL_SETTING: &str = "auto_backup_hours";
 const LAST_AUTO_BACKUP_SETTING: &str = "last_auto_backup_at";
+#[cfg(feature = "self-update")]
 const UPDATE_AVAILABLE_SETTING: &str = "update_available_version";
 
 pub fn sha256_hex(value: &str) -> String {
@@ -86,6 +87,7 @@ pub enum View {
     Reports,
     Categories,
     Payments,
+    #[cfg(feature = "self-update")]
     Update,
     Search,
     Activity,
@@ -185,8 +187,11 @@ pub struct AppState {
     pub payment_category_id: Option<CategoryId>,
     pub feedback: Option<String>,
     pub toast: Option<String>,
+    #[cfg(feature = "self-update")]
     pub update_url: String,
+    #[cfg(feature = "self-update")]
     pub update_status: Option<String>,
+    #[cfg(feature = "self-update")]
     pub update_available: Option<String>,
     pub editing_expense: Option<ExpenseId>,
     pub editing_income: Option<IncomeId>,
@@ -264,8 +269,11 @@ impl AppState {
             payment_category_id: None,
             feedback: None,
             toast: None,
+            #[cfg(feature = "self-update")]
             update_url: String::new(),
+            #[cfg(feature = "self-update")]
             update_status: None,
+            #[cfg(feature = "self-update")]
             update_available: None,
             editing_expense: None,
             editing_income: None,
@@ -317,11 +325,14 @@ impl AppState {
                 .flatten()
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(12);
-            state.update_available = repo
-                .get_setting(UPDATE_AVAILABLE_SETTING)
-                .ok()
-                .flatten()
-                .filter(|v| !v.is_empty());
+            #[cfg(feature = "self-update")]
+            {
+                state.update_available = repo
+                    .get_setting(UPDATE_AVAILABLE_SETTING)
+                    .ok()
+                    .flatten()
+                    .filter(|v| !v.is_empty());
+            }
         }
         state.locked = state.pin_hash.is_some();
         state.seed_categories();
@@ -405,16 +416,19 @@ impl AppState {
         if self.rate_input.is_empty() {
             self.rate_input = input_from_cents(self.exchange_rate_cents);
         }
-        if self.update_url.is_empty()
-            && let Ok(Some(url)) = repo.get_setting(UPDATE_URL_SETTING)
+        #[cfg(feature = "self-update")]
         {
-            self.update_url = url;
+            if self.update_url.is_empty()
+                && let Ok(Some(url)) = repo.get_setting(UPDATE_URL_SETTING)
+            {
+                self.update_url = url;
+            }
+            self.update_available = repo
+                .get_setting(UPDATE_AVAILABLE_SETTING)
+                .ok()
+                .flatten()
+                .filter(|v| !v.is_empty());
         }
-        self.update_available = repo
-            .get_setting(UPDATE_AVAILABLE_SETTING)
-            .ok()
-            .flatten()
-            .filter(|v| !v.is_empty());
         let from = NaiveDate::from_ymd_opt(2000, 1, 1).expect("valid date");
         let to = NaiveDate::from_ymd_opt(2100, 12, 31).expect("valid date");
         if let Ok(expenses) = repo.expenses_between(from, to) {
@@ -496,6 +510,7 @@ impl AppState {
         }
     }
 
+    #[cfg(feature = "self-update")]
     pub fn set_update_url(&mut self, value: String) {
         self.update_url = value;
         self.update_status = None;
@@ -514,6 +529,7 @@ impl AppState {
         self.payment_amount = (initial + count * installment).to_string();
     }
 
+    #[cfg(feature = "self-update")]
     pub fn prepare_update(&mut self) -> Result<UpdateSource, String> {
         let base = self.update_url.trim().trim_end_matches('/').to_owned();
         if let Ok(repo) = self.repo.lock() {
@@ -522,6 +538,7 @@ impl AppState {
         self.prepare_update_source()
     }
 
+    #[cfg(feature = "self-update")]
     pub fn update_app(&mut self, progress: &(dyn Fn(UpdateProgress) + Send + Sync)) {
         let source = match self.prepare_update() {
             Ok(source) => source,
@@ -536,11 +553,13 @@ impl AppState {
         });
     }
 
+    #[cfg(feature = "self-update")]
     pub fn resolve_update_for_download(&self) -> Result<crate::platform::ResolvedUpdate, String> {
         let source = self.prepare_update_source()?;
         crate::platform::resolve_update(&source)
     }
 
+    #[cfg(feature = "self-update")]
     fn prepare_update_source(&self) -> Result<UpdateSource, String> {
         let base = self.update_url.trim().trim_end_matches('/').to_owned();
         if base.is_empty() {
@@ -552,6 +571,7 @@ impl AppState {
         Ok(UpdateSource::Local(base))
     }
 
+    #[cfg(feature = "self-update")]
     pub fn finish_background_download(&mut self, status: &str, message: &str) {
         match status {
             "started" => {
@@ -2197,6 +2217,7 @@ pub fn start_auto_backup_loop(repo: Arc<Mutex<SqliteRepository>>) {
     });
 }
 
+#[cfg(feature = "self-update")]
 fn check_update_available(repo: &SqliteRepository) -> Option<String> {
     let source = repo
         .get_setting(UPDATE_URL_SETTING)
@@ -2233,11 +2254,13 @@ pub fn start_rate_refresh_loop(repo: Arc<Mutex<SqliteRepository>>) {
     });
 }
 
+#[cfg(feature = "self-update")]
 fn store_update_available(repo: &SqliteRepository, available: Option<String>) {
     let _ = repo.set_setting(UPDATE_AVAILABLE_SETTING, available.as_deref().unwrap_or(""));
 }
 
 /// Revisa periódicamente si hay una versión nueva publicada.
+#[cfg(feature = "self-update")]
 pub fn start_update_check_loop(repo: Arc<Mutex<SqliteRepository>>) {
     std::thread::spawn(move || {
         loop {
@@ -2250,6 +2273,7 @@ pub fn start_update_check_loop(repo: Arc<Mutex<SqliteRepository>>) {
     });
 }
 
+#[cfg(feature = "self-update")]
 pub fn check_update_on_start(repo: Arc<Mutex<SqliteRepository>>) {
     std::thread::spawn(move || {
         let available = repo.lock().ok().and_then(|g| check_update_available(&g));
@@ -2273,6 +2297,7 @@ mod tests {
         assert_eq!(parse_cents(""), None);
     }
 
+    #[cfg(feature = "self-update")]
     #[test]
     fn prepare_update_uses_github_unless_local_url_is_set() {
         let repo = finance_store::SqliteRepository::open_in_memory().expect("repo en memoria");

@@ -19,6 +19,7 @@ ANDROID_RES="$ROOT/crates/finance-app/android/res/xml"
 ANDROID_KOTLIN_DIR="$ROOT/crates/finance-app/android/kotlin/dev/dioxus/main"
 VERSION_FILE="$ROOT/crates/finance-app/android/version-code.txt"
 UPDATES="$ROOT/updates"
+FDROID="${FINANCEVZ_FDROID:-0}"
 
 LAST_CODE="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
 [[ "$LAST_CODE" =~ ^[0-9]+$ ]] || LAST_CODE=1
@@ -26,38 +27,60 @@ CODE=$((LAST_CODE + 1))
 VERSION_NAME="0.1.$CODE"
 
 mkdir -p "$GEN/app/src/main/res/xml"
-cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
-cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
-cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+if [ "$FDROID" = "1" ]; then
+    cp "$ANDROID_RES/network_security_config.fdroid.xml" "$GEN/app/src/main/res/xml/network_security_config.xml"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.fdroid.xml" "$GEN/app/src/main/AndroidManifest.xml"
+else
+    cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+fi
 
 bash scripts/install-brand-icon.sh "$GEN"
-dx build --android -p finance-app --target "$TARGET"
+DX_FEATURES=""
+if [ "$FDROID" = "1" ]; then
+    DX_FEATURES="--no-default-features --features mobile"
+fi
+dx build --android -p finance-app --target "$TARGET" $DX_FEATURES
 
 # dx regenera el Gradle en cada build: subimos versionCode para que Android acepte la actualización.
 GRADLE="$GEN/app/build.gradle.kts"
 sed -i -E "s/versionCode = [0-9]+/versionCode = $CODE/; s/versionName = \"[^\"]*\"/versionName = \"$VERSION_NAME\"/" "$GRADLE"
 grep -q "versionCode = $CODE" "$GRADLE"
 grep -q "versionName = \"$VERSION_NAME\"" "$GRADLE"
-bash scripts/patch-android-gradle.sh "$GRADLE"
+PATCH_ARGS="$GRADLE"
+if [ "$FDROID" = "1" ]; then PATCH_ARGS="$GRADLE fdroid"; fi
+bash scripts/patch-android-gradle.sh $PATCH_ARGS
 
-cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
-cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
-cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
-mkdir -p "$GEN/app/src/main/kotlin/dev/dioxus/main"
-cp "$ANDROID_KOTLIN_DIR"/*.kt "$GEN/app/src/main/kotlin/dev/dioxus/main/"
-cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+mkdir -p "$GEN/app/src/main/res/xml" "$GEN/app/src/main/kotlin/dev/dioxus/main"
+if [ "$FDROID" = "1" ]; then
+    cp "$ANDROID_RES/network_security_config.fdroid.xml" "$GEN/app/src/main/res/xml/network_security_config.xml"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.fdroid.xml" "$GEN/app/src/main/AndroidManifest.xml"
+    cp "$ANDROID_KOTLIN_DIR/MainActivity.fdroid.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+    cp "$ANDROID_KOTLIN_DIR/UpdateCheckWorker.fdroid.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/UpdateCheckWorker.kt"
+else
+    cp "$ANDROID_RES/network_security_config.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ANDROID_RES/file_paths.xml" "$GEN/app/src/main/res/xml/"
+    cp "$ROOT/crates/finance-app/android/AndroidManifest.xml" "$GEN/app/src/main/AndroidManifest.xml"
+    cp "$ANDROID_KOTLIN_DIR/MainActivity.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+    cp "$ANDROID_KOTLIN_DIR/UpdateCheckWorker.kt" "$GEN/app/src/main/kotlin/dev/dioxus/main/UpdateCheckWorker.kt"
+fi
 bash scripts/install-brand-icon.sh "$GEN"
 (cd "$GEN" && ./gradlew assembleDebug)
 
 APK="$GEN/app/build/outputs/apk/debug/app-debug.apk"
-mkdir -p "$UPDATES"
-cp "$APK" "$UPDATES/financevz.apk"
-SHA256="$(sha256sum "$UPDATES/financevz.apk" | awk '{print $1}')"
-printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk", "sha256": "%s"}\n' \
-  "$CODE" "$VERSION_NAME" "$SHA256" > "$UPDATES/update.json"
-printf '%s\n' "$CODE" > "$VERSION_FILE"
+if [ "$FDROID" != "1" ]; then
+    mkdir -p "$UPDATES"
+    cp "$APK" "$UPDATES/financevz.apk"
+    SHA256="$(sha256sum "$UPDATES/financevz.apk" | awk '{print $1}')"
+    printf '{"version_code": %d, "version_name": "%s", "apk": "financevz.apk", "sha256": "%s"}\n' \
+      "$CODE" "$VERSION_NAME" "$SHA256" > "$UPDATES/update.json"
+    printf '%s\n' "$CODE" > "$VERSION_FILE"
 
-IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-echo "APK listo: $APK"
-echo "Servidor: python3 scripts/serve-update.sh"
-echo "URL para el botón Actualizar: http://${IP:-192.168.0.10}:8000"
+    IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    echo "APK listo: $APK"
+    echo "Servidor: python3 scripts/serve-update.sh"
+    echo "URL para el botón Actualizar: http://${IP:-192.168.0.10}:8000"
+else
+    echo "APK F-Droid listo: $APK"
+fi

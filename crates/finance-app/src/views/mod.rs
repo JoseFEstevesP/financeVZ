@@ -8,4 +8,5 @@ pub mod payments;
 pub mod reports;
 pub mod search;
 pub mod settings;
+#[cfg(feature = "self-update")]
 pub mod update;

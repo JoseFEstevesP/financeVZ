@@ -19,6 +19,7 @@ enum BridgeMessage {
         ok: bool,
         message: String,
     },
+    #[cfg(feature = "self-update")]
     #[serde(rename = "download_result")]
     DownloadResult { status: String, message: String },
     #[serde(rename = "open_settings")]
@@ -38,6 +39,7 @@ pub fn use_bridge(mut state: Signal<AppState>) {
                         ok,
                         message,
                     } => state.write().finish_biometric(&action, ok, &message),
+                    #[cfg(feature = "self-update")]
                     BridgeMessage::DownloadResult { status, message } => {
                         state.write().finish_background_download(&status, &message);
                     }
@@ -80,6 +82,7 @@ pub fn request_light_theme(light: bool) {
     ));
 }
 
+#[cfg(feature = "self-update")]
 pub fn request_background_download(url: &str, sha256: &str, version_code: i64, version_name: &str) {
     let url = serde_json::to_string(url).unwrap_or_else(|_| "\"\"".to_owned());
     let sha = serde_json::to_string(sha256).unwrap_or_else(|_| "\"\"".to_owned());

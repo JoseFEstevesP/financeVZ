@@ -11,10 +11,11 @@ use finance_store::SqliteRepository;
 
 use components::icon::Icon;
 use state::{AppState, View};
+#[cfg(feature = "self-update")]
+use views::update::Update;
 use views::{
     activity::Activity, add::Add, add_income::AddIncome, categories::Categories, home::Home,
     income::Incomes, payments::Payments, reports::Reports, search::Search, settings::Settings,
-    update::Update,
 };
 
 static APP_STATE: OnceLock<AppState> = OnceLock::new();
@@ -31,9 +32,12 @@ pub fn run() {
     state::start_auto_backup_loop(backup_repo);
     let rate_repo = state.repo.clone();
     state::start_rate_refresh_loop(rate_repo);
-    let update_repo = state.repo.clone();
-    state::start_update_check_loop(update_repo.clone());
-    state::check_update_on_start(update_repo);
+    #[cfg(feature = "self-update")]
+    {
+        let update_repo = state.repo.clone();
+        state::start_update_check_loop(update_repo.clone());
+        state::check_update_on_start(update_repo);
+    }
     state.update_rate_from_api();
     let _ = APP_STATE.set(state);
     dioxus::launch(App);
@@ -76,6 +80,7 @@ fn App() -> Element {
     let biometric_unlock = snapshot.biometric_enabled;
     let evidence = snapshot.evidence_viewer.clone();
     let pending_delete_message = snapshot.pending_delete_message();
+    #[cfg(feature = "self-update")]
     let update_available = snapshot.update_available.clone();
     let shell_class = if snapshot.is_light_theme() {
         "shell theme-light"
@@ -101,6 +106,21 @@ fn App() -> Element {
         }
     });
 
+    #[cfg(feature = "self-update")]
+    let update_banner = rsx! {
+        if let Some(version) = update_available {
+            if view != View::Settings {
+                button {
+                    class: "update-banner",
+                    onclick: move |_| app_state.write().set_view(View::Settings),
+                    "Nueva versión disponible: v{version}. Toca para actualizar."
+                }
+            }
+        }
+    };
+    #[cfg(not(feature = "self-update"))]
+    let update_banner = rsx! {};
+
     let content = match view {
         View::Home => rsx! {
             Home { state: app_state, go_add: move |_| app_state.write().set_view(View::Add) }
@@ -111,6 +131,7 @@ fn App() -> Element {
         View::Reports => rsx! { Reports { state: app_state } },
         View::Categories => rsx! { Categories { state: app_state } },
         View::Payments => rsx! { Payments { state: app_state } },
+        #[cfg(feature = "self-update")]
         View::Update => rsx! { Update { state: app_state } },
         View::Search => rsx! { Search { state: app_state } },
         View::Activity => rsx! { Activity { state: app_state } },
@@ -141,15 +162,7 @@ fn App() -> Element {
                 }
             }
             main { class: "content", {content} }
-            if let Some(version) = update_available {
-                if view != View::Settings {
-                    button {
-                        class: "update-banner",
-                        onclick: move |_| app_state.write().set_view(View::Settings),
-                        "Nueva versión disponible: v{version}. Toca para actualizar."
-                    }
-                }
-            }
+            {update_banner}
             if let Some(message) = toast {
                 div { class: "toast", role: "status", "{message}" }
             }
