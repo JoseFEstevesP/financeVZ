@@ -4,6 +4,12 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.48] - 2026-11-28
+
+### Corregido
+
+- El banner de actualización ya no muestra versiones obsoletas guardadas en ajustes; al cargar se valida contra la versión instalada y se limpia si ya no aplica.
+
 ## [0.1.47] - 2026-11-28
 
 ### Cambiado

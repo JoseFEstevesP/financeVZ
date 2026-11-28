@@ -431,11 +431,7 @@ impl AppState {
             {
                 self.update_url = url;
             }
-            self.update_available = repo
-                .get_setting(UPDATE_AVAILABLE_SETTING)
-                .ok()
-                .flatten()
-                .filter(|v| !v.is_empty());
+            self.update_available = load_update_available(&repo);
         }
         let from = NaiveDate::from_ymd_opt(2000, 1, 1).expect("valid date");
         let to = NaiveDate::from_ymd_opt(2100, 12, 31).expect("valid date");
@@ -2300,6 +2296,35 @@ pub fn start_rate_refresh_loop(repo: Arc<Mutex<SqliteRepository>>) {
             }
         }
     });
+}
+
+#[cfg(feature = "self-update")]
+fn load_update_available(repo: &SqliteRepository) -> Option<String> {
+    let value = repo
+        .get_setting(UPDATE_AVAILABLE_SETTING)
+        .ok()
+        .flatten()
+        .filter(|v| !v.is_empty())?;
+    let (local_code, _) = platform::local_version();
+    let available_code = parse_version_code(&value)?;
+    if available_code > local_code {
+        Some(value)
+    } else {
+        let _ = repo.set_setting(UPDATE_AVAILABLE_SETTING, "");
+        None
+    }
+}
+
+#[cfg(feature = "self-update")]
+fn parse_version_code(value: &str) -> Option<i64> {
+    let clean = value.trim().trim_start_matches(['v', 'V']);
+    let patch = clean.split('.').nth(2)?;
+    let digits: String = patch.chars().take_while(|c| c.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        None
+    } else {
+        digits.parse().ok()
+    }
 }
 
 #[cfg(feature = "self-update")]

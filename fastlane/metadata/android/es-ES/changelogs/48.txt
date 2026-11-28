@@ -1,0 +1,1 @@
+• Corrige aviso de actualización obsoleto que mostraba una versión antigua.
