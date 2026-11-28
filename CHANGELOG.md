@@ -4,6 +4,20 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.51] - 2026-11-28
+
+### Añadido
+
+- Configuración: catálogo local extensible de temas (Oscuro, Claro, OLED negro, Sepia, Alto contraste, Estilo commit) con preview y persistencia.
+
+### Cambiado
+
+- Tema aplicado por `theme_id` con compatibilidad para valores anteriores; bridge/Kotlin actualizados para barras del sistema por tema.
+
+### Eliminado
+
+- Ruta muerta `View::Update`; la actualización queda embebida en Ajustes.
+
 ## [0.1.50] - 2026-11-28
 
 ### Corregido

@@ -1,0 +1,2 @@
+• Catálogo de temas en Configuración: Oscuro, Claro, OLED negro, Sepia, Alto contraste y Estilo commit.
+• Limpieza interna: ruta de actualización muerta eliminada.

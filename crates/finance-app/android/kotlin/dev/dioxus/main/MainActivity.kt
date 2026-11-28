@@ -39,7 +39,7 @@ class MainActivity : WryActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyTheme(prefs.getBoolean("light_theme", false))
+        applyTheme(prefs.getString("theme_id", if (prefs.getBoolean("light_theme", false)) "light" else "dark") ?: "dark")
         restorePendingDownload()
         requestNotificationPermissionIfNeeded()
         UpdateCheckWorker.schedule(this)
@@ -251,17 +251,27 @@ class MainActivity : WryActivity() {
         }
     }
 
-    private fun applyTheme(light: Boolean) {
-        val background = if (light) "#f7f9fd" else "#0f1420"
-        val navigation = if (light) "#eef2fb" else "#121826"
+    private data class ThemePalette(val background: String, val navigation: String, val lightBars: Boolean)
+
+    private fun themePalette(themeId: String): ThemePalette = when (themeId) {
+        "light" -> ThemePalette("#f7f9fd", "#eef2fb", true)
+        "oled" -> ThemePalette("#000000", "#000000", false)
+        "sepia" -> ThemePalette("#f4ecd8", "#fff8e8", true)
+        "high-contrast" -> ThemePalette("#000000", "#000000", false)
+        "commit" -> ThemePalette("#0d1117", "#161b22", false)
+        else -> ThemePalette("#0f1420", "#121826", false)
+    }
+
+    private fun applyTheme(themeId: String) {
+        val palette = themePalette(themeId)
         @Suppress("DEPRECATION")
-        window.statusBarColor = Color.parseColor(background)
+        window.statusBarColor = Color.parseColor(palette.background)
         @Suppress("DEPRECATION")
-        window.navigationBarColor = Color.parseColor(navigation)
-        window.setBackgroundDrawable(ColorDrawable(Color.parseColor(background)))
+        window.navigationBarColor = Color.parseColor(palette.navigation)
+        window.setBackgroundDrawable(ColorDrawable(Color.parseColor(palette.background)))
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = light
-            isAppearanceLightNavigationBars = light
+            isAppearanceLightStatusBars = palette.lightBars
+            isAppearanceLightNavigationBars = palette.lightBars
         }
     }
 
@@ -509,8 +519,17 @@ class MainActivity : WryActivity() {
 
         @JavascriptInterface
         fun setLightTheme(light: Boolean) {
-            prefs.edit().putBoolean("light_theme", light).apply()
-            runOnUiThread { applyTheme(light) }
+            setTheme(if (light) "light" else "dark")
+        }
+
+        @JavascriptInterface
+        fun setTheme(themeId: String) {
+            val normalized = when (themeId) {
+                "light", "oled", "sepia", "high-contrast", "commit", "dark" -> themeId
+                else -> "dark"
+            }
+            prefs.edit().putString("theme_id", normalized).putBoolean("light_theme", normalized == "light" || normalized == "sepia").apply()
+            runOnUiThread { applyTheme(normalized) }
         }
 
         @JavascriptInterface

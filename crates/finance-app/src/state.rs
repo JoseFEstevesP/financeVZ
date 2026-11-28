@@ -87,8 +87,6 @@ pub enum View {
     Reports,
     Categories,
     Payments,
-    #[cfg(feature = "self-update")]
-    Update,
     Search,
     Activity,
     Settings,
@@ -215,7 +213,7 @@ pub struct AppState {
     pub pin_error: Option<String>,
     pub locked: bool,
     pub text_scale: String,
-    pub theme: String,
+    pub theme_id: String,
     pub biometric_enabled: bool,
     pub auto_backup_hours: i64,
     pub evidence_viewer: Option<String>,
@@ -301,7 +299,7 @@ impl AppState {
             pin_error: None,
             locked: false,
             text_scale: "normal".to_owned(),
-            theme: "dark".to_owned(),
+            theme_id: crate::theme::default_theme().id.to_owned(),
             biometric_enabled: false,
             auto_backup_hours: 12,
             evidence_viewer: None,
@@ -316,11 +314,12 @@ impl AppState {
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| "normal".to_owned());
-            state.theme = repo
+            state.theme_id = repo
                 .get_setting(THEME_SETTING)
                 .ok()
                 .flatten()
-                .unwrap_or_else(|| "dark".to_owned());
+                .map(|value| crate::theme::resolve(&value).id.to_owned())
+                .unwrap_or_else(|| crate::theme::default_theme().id.to_owned());
             state.biometric_enabled = repo
                 .get_setting(BIOMETRIC_SETTING)
                 .ok()
@@ -1896,17 +1895,17 @@ impl AppState {
         }
     }
 
-    pub fn is_light_theme(&self) -> bool {
-        self.theme == "light"
+    pub fn current_theme(&self) -> &'static crate::theme::ThemeDef {
+        crate::theme::resolve(&self.theme_id)
     }
 
     pub fn set_theme(&mut self, value: &str) {
-        let theme = if value == "light" { "light" } else { "dark" }.to_owned();
+        let theme = crate::theme::resolve(value);
         if let Ok(repo) = self.repo.lock() {
-            let _ = repo.set_setting(THEME_SETTING, &theme);
+            let _ = repo.set_setting(THEME_SETTING, theme.id);
         }
-        self.theme = theme;
-        self.feedback = Some("Tema actualizado".into());
+        self.theme_id = theme.id.to_owned();
+        self.feedback = Some(format!("Tema actualizado: {}.", theme.name));
     }
 
     pub fn request_biometric(&mut self, action: &str) {

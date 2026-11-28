@@ -2,6 +2,7 @@ pub mod bridge;
 pub mod components;
 pub mod platform;
 pub mod state;
+pub mod theme;
 pub mod views;
 
 use std::sync::OnceLock;
@@ -11,8 +12,6 @@ use finance_store::SqliteRepository;
 
 use components::icon::Icon;
 use state::{AppState, View};
-#[cfg(feature = "self-update")]
-use views::update::Update;
 use views::{
     activity::Activity, add::Add, add_income::AddIncome, categories::Categories, home::Home,
     income::Incomes, payments::Payments, reports::Reports, search::Search, settings::Settings,
@@ -82,11 +81,8 @@ fn App() -> Element {
     let pending_delete_message = snapshot.pending_delete_message();
     #[cfg(feature = "self-update")]
     let update_available = snapshot.update_available.clone();
-    let shell_class = if snapshot.is_light_theme() {
-        "shell theme-light"
-    } else {
-        "shell"
-    };
+    let theme = snapshot.current_theme();
+    let shell_class = format!("shell {}", theme.css_class);
     let root_font_size = match snapshot.text_scale.as_str() {
         "small" => 14,
         "large" => 18,
@@ -96,8 +92,8 @@ fn App() -> Element {
     drop(snapshot);
 
     use_effect(move || {
-        let light = app_state.read().is_light_theme();
-        bridge::request_light_theme(light);
+        let theme_id = app_state.read().current_theme().id;
+        bridge::request_theme(theme_id);
     });
 
     use_effect(move || {
@@ -131,8 +127,6 @@ fn App() -> Element {
         View::Reports => rsx! { Reports { state: app_state } },
         View::Categories => rsx! { Categories { state: app_state } },
         View::Payments => rsx! { Payments { state: app_state } },
-        #[cfg(feature = "self-update")]
-        View::Update => rsx! { Update { state: app_state } },
         View::Search => rsx! { Search { state: app_state } },
         View::Activity => rsx! { Activity { state: app_state } },
         View::Settings => rsx! { Settings { state: app_state } },
@@ -249,7 +243,7 @@ fn App() -> Element {
 const BRAND_SYMBOL_PATH: &str = "M 58 136 H 90 A 14 14 0 0 1 104 150 V 202 A 14 14 0 0 1 90 216 H 58 A 14 14 0 0 1 44 202 V 150 A 14 14 0 0 1 58 136 Z M 118 96 H 150 A 14 14 0 0 1 164 110 V 202 A 14 14 0 0 1 150 216 H 118 A 14 14 0 0 1 104 202 V 110 A 14 14 0 0 1 118 96 Z M 178 76 H 210 A 14 14 0 0 1 224 90 V 202 A 14 14 0 0 1 210 216 H 178 A 14 14 0 0 1 164 202 V 90 A 14 14 0 0 1 178 76 Z M 192 18 L 226 74 L 158 74 Z";
 
 const STYLES: &str = r#"
-:root {
+:root, .theme-dark {
   --bg: #0f1420; --text: #eef2fb; --muted: #93a0b8; --card: #161d2b; --border: #232d40;
   --input-bg: #0e1421; --input-border: #2b3752; --primary: #4f8cff; --primary-text: #fff;
   --accent: #2dd4a7; --link: #8fb4ff; --link-border: #2c4a86; --chip-bg: #0e1421;
@@ -276,6 +270,62 @@ const STYLES: &str = r#"
   --modal-bg: #ffffff; --bar-bg: #f1f5fb; --bar-start: #316cdb; --bar-end: #1e4fa3;
   --evidence-bg: #f1f5fb; --file-border: #9ab4e0; --file-active: #dce8ff;
   --shadow: rgba(30, 45, 75, .18);
+}
+.theme-oled {
+  --bg: #000000; --text: #f5f7fb; --muted: #9aa3b2; --card: #101010; --border: #242424;
+  --input-bg: #050505; --input-border: #303030; --primary: #4f8cff; --primary-text: #fff;
+  --accent: #2dd4a7; --link: #8fb4ff; --link-border: #35507f; --chip-bg: #050505;
+  --chip-text: #d0d7e2; --chip-active-bg: #14203a; --nav-bg: #000000; --nav-border: #242424;
+  --hero-start: #121212; --hero-end: #050505; --hero-border: #2a2a2a;
+  --secondary-bg: #14203a; --secondary-text: #dce8ff; --row-border: #202020;
+  --toast-bg: #0e2b24; --toast-text: #d8fff2; --toast-border: #2dd4a7;
+  --alert-bg: #2a1a10; --alert-border: #8a5a24; --urgent: #ffb38a;
+  --positive: #2dd4a7; --negative: #ff8a8a; --overlay: rgba(0, 0, 0, .94);
+  --modal-bg: #101010; --bar-bg: #050505; --bar-start: #4f8cff; --bar-end: #2f5fb8;
+  --evidence-bg: #050505; --file-border: #35507f; --file-active: #14203a;
+  --shadow: rgba(0, 0, 0, .7);
+}
+.theme-sepia {
+  --bg: #f4ecd8; --text: #3b2f1e; --muted: #746247; --card: #fff8e8; --border: #dccca8;
+  --input-bg: #fbf4e3; --input-border: #ccb98c; --primary: #8b5e34; --primary-text: #fffaf0;
+  --accent: #5f8f3a; --link: #7a4f24; --link-border: #c4a06f; --chip-bg: #fbf4e3;
+  --chip-text: #4d3b25; --chip-active-bg: #ead7b6; --nav-bg: #fff8e8; --nav-border: #dccca8;
+  --hero-start: #ead7b6; --hero-end: #fff8e8; --hero-border: #d1bc90;
+  --secondary-bg: #ead7b6; --secondary-text: #5a3a16; --row-border: #eadfcb;
+  --toast-bg: #edf5dc; --toast-text: #36511b; --toast-border: #5f8f3a;
+  --alert-bg: #fdeed8; --alert-border: #c48a3f; --urgent: #9a4f1b;
+  --positive: #4f7a2f; --negative: #b24a3a; --overlay: rgba(59, 47, 30, .45);
+  --modal-bg: #fff8e8; --bar-bg: #fbf4e3; --bar-start: #8b5e34; --bar-end: #5f3f20;
+  --evidence-bg: #fbf4e3; --file-border: #c4a06f; --file-active: #ead7b6;
+  --shadow: rgba(59, 47, 30, .2);
+}
+.theme-high-contrast {
+  --bg: #000000; --text: #ffffff; --muted: #e0e0e0; --card: #111111; --border: #ffffff;
+  --input-bg: #000000; --input-border: #ffffff; --primary: #00aaff; --primary-text: #000000;
+  --accent: #00ff88; --link: #00ccff; --link-border: #00ccff; --chip-bg: #000000;
+  --chip-text: #ffffff; --chip-active-bg: #003344; --nav-bg: #000000; --nav-border: #ffffff;
+  --hero-start: #001522; --hero-end: #000000; --hero-border: #00ccff;
+  --secondary-bg: #003344; --secondary-text: #ffffff; --row-border: #ffffff;
+  --toast-bg: #002a18; --toast-text: #ffffff; --toast-border: #00ff88;
+  --alert-bg: #331a00; --alert-border: #ffcc00; --urgent: #ffcc00;
+  --positive: #00ff88; --negative: #ff5555; --overlay: rgba(0, 0, 0, .96);
+  --modal-bg: #111111; --bar-bg: #000000; --bar-start: #00aaff; --bar-end: #0077cc;
+  --evidence-bg: #000000; --file-border: #00ccff; --file-active: #003344;
+  --shadow: rgba(255, 255, 255, .15);
+}
+.theme-commit {
+  --bg: #0d1117; --text: #c9d1d9; --muted: #8b949e; --card: #161b22; --border: #30363d;
+  --input-bg: #0d1117; --input-border: #30363d; --primary: #238636; --primary-text: #ffffff;
+  --accent: #3fb950; --link: #58a6ff; --link-border: #1f6feb; --chip-bg: #0d1117;
+  --chip-text: #c9d1d9; --chip-active-bg: #1f2d1f; --nav-bg: #161b22; --nav-border: #30363d;
+  --hero-start: #132018; --hero-end: #161b22; --hero-border: #2ea043;
+  --secondary-bg: #1f2d1f; --secondary-text: #c9d1d9; --row-border: #21262d;
+  --toast-bg: #12261a; --toast-text: #aff5b4; --toast-border: #3fb950;
+  --alert-bg: #2d2111; --alert-border: #9e6a03; --urgent: #f0883e;
+  --positive: #3fb950; --negative: #f85149; --overlay: rgba(1, 4, 9, .9);
+  --modal-bg: #161b22; --bar-bg: #0d1117; --bar-start: #238636; --bar-end: #2ea043;
+  --evidence-bg: #0d1117; --file-border: #2ea043; --file-active: #1f2d1f;
+  --shadow: rgba(0, 0, 0, .5);
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
@@ -429,6 +479,19 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .balance-negative { color: var(--negative); }
 .secondary.wide { width: 100%; margin-top: 1rem; }
 .subheading { color: var(--chip-text); font-size: .8125rem; margin: 1rem 0 .375rem; }
+.theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.theme-card { position: relative; display: flex; flex-direction: column; gap: .625rem; text-align: left;
+  background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border);
+  border-radius: .875rem; padding: .75rem; cursor: pointer; }
+.theme-card.active { border-color: var(--primary); background: var(--chip-active-bg); }
+.theme-preview { display: grid; grid-template-columns: repeat(4, 1fr); gap: .375rem; }
+.theme-swatch { height: 1.75rem; border-radius: .5rem; border: 1px solid rgba(127,127,127,.25); }
+.theme-meta { display: flex; flex-direction: column; gap: .125rem; }
+.theme-meta strong { font-size: .875rem; }
+.theme-meta small { font-size: .75rem; line-height: 1.3; }
+.theme-badge { position: absolute; top: .625rem; right: .625rem; font-size: .6875rem; font-weight: 700;
+  color: var(--primary-text); background: var(--primary); border-radius: 999px; padding: .125rem .5rem; }
+@media (max-width: 420px) { .theme-grid { grid-template-columns: 1fr; } }
 .date-range { display: grid; grid-template-columns: 1fr 1fr; gap: .625rem; }
 .backup-json { resize: vertical; font-family: ui-monospace, monospace; font-size: .75rem; }
 .overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;

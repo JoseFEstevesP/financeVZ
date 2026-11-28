@@ -94,10 +94,12 @@ pub fn request_biometric(action: &str) {
     dioxus::document::eval(&script);
 }
 
-pub fn request_light_theme(light: bool) {
-    dioxus::document::eval(&format!(
-        "if (window.FinanzasVZBiometric) window.FinanzasVZBiometric.setLightTheme({light});"
-    ));
+pub fn request_theme(theme_id: &str) {
+    let id = serde_json::to_string(theme_id).unwrap_or_else(|_| "\"dark\"".to_owned());
+    let script = format!(
+        "if (window.FinanzasVZBiometric && window.FinanzasVZBiometric.setTheme)          window.FinanzasVZBiometric.setTheme({id});          else if (window.FinanzasVZBiometric && window.FinanzasVZBiometric.setLightTheme)          window.FinanzasVZBiometric.setLightTheme({id} === 'light');"
+    );
+    dioxus::document::eval(&script);
 }
 
 #[cfg(feature = "self-update")]

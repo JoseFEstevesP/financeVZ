@@ -1,0 +1,2 @@
+• Theme catalog in Settings: Dark, Light, OLED black, Sepia, High contrast, and Commit style.
+• Internal cleanup: removed dead update route.

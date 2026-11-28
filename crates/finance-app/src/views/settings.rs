@@ -25,7 +25,7 @@ pub fn Settings(props: SettingsProps) -> Element {
     let pin_input = snapshot.pin_input.clone();
     let pin_error = snapshot.pin_error.clone();
     let text_scale = snapshot.text_scale.clone();
-    let theme = snapshot.theme.clone();
+    let current_theme_id = snapshot.theme_id.clone();
     let auto_backup_hours = snapshot.auto_backup_hours;
     let auto_backup_status = snapshot.auto_backup_status();
     drop(snapshot);
@@ -52,13 +52,27 @@ pub fn Settings(props: SettingsProps) -> Element {
         div { class: "page",
             div { class: "card",
                 h3 { "Tema" }
-                p { class: "muted", "El tema oscuro es el predeterminado. Puedes cambiarlo cuando quieras." }
-                div { class: "row-buttons",
-                    for (value, label) in [("dark", "Oscuro"), ("light", "Claro")] {
+                p { class: "muted",
+                    "Elige el estilo visual de la app. El tema oscuro actual es el predeterminado."
+                }
+                div { class: "theme-grid",
+                    for theme in crate::theme::THEMES {
                         button {
-                            class: if theme == value { "chip active" } else { "chip" },
-                            onclick: move |_| app_state.write().set_theme(value),
-                            "{label}"
+                            key: "{theme.id}",
+                            class: if current_theme_id == theme.id { "theme-card active" } else { "theme-card" },
+                            onclick: move |_| app_state.write().set_theme(theme.id),
+                            div { class: "theme-preview",
+                                for color in theme.preview {
+                                    span { class: "theme-swatch", style: "background:{color};" }
+                                }
+                            }
+                            div { class: "theme-meta",
+                                strong { "{theme.name}" }
+                                small { class: "muted", "{theme.description}" }
+                            }
+                            if current_theme_id == theme.id {
+                                span { class: "theme-badge", "Actual" }
+                            }
                         }
                     }
                 }
