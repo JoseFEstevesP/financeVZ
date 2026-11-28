@@ -57,6 +57,7 @@ class MainActivity : WryActivity() {
         checkPendingDownload()
         cleanupInstalledUpdate()
         clearStaleUpdateNotification()
+        notifyNotificationStatus()
     }
 
     private fun cleanupInstalledUpdate() {
@@ -143,6 +144,7 @@ class MainActivity : WryActivity() {
         if (intent?.getBooleanExtra("open_settings", false) == true) {
             view.postDelayed({ notifyOpenSettings() }, 700)
         }
+        view.postDelayed({ notifyNotificationStatus() }, 700)
     }
 
     private fun handleOpenSettingsIntent(intent: Intent?) {
@@ -158,11 +160,27 @@ class MainActivity : WryActivity() {
         }
     }
 
+    private fun notificationsEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        if (notificationsEnabled()) return
         if (prefs.getBoolean(PREF_NOTIFICATION_PROMPT_DONE, false)) return
         showPermissionRationale()
+    }
+
+    private fun notifyNotificationStatus() {
+        webView?.post {
+            val payload = JSONObject()
+                .put("kind", "notification_status")
+                .put("granted", notificationsEnabled())
+            webView?.evaluateJavascript("window.__fvzBridge && window.__fvzBridge.send($payload)", null)
+        }
     }
 
     private fun showPermissionRationale() {
@@ -178,6 +196,7 @@ class MainActivity : WryActivity() {
             }
             .setNegativeButton("Ahora no") { _, _ ->
                 prefs.edit().putBoolean(PREF_NOTIFICATION_PROMPT_DONE, true).apply()
+                notifyNotificationStatus()
             }
             .show()
     }
@@ -190,6 +209,7 @@ class MainActivity : WryActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != REQUEST_POST_NOTIFICATIONS) return
         prefs.edit().putBoolean(PREF_NOTIFICATION_PROMPT_DONE, true).apply()
+        notifyNotificationStatus()
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) return
         AlertDialog.Builder(this)
             .setTitle("Avisos desactivados")
@@ -237,6 +257,21 @@ class MainActivity : WryActivity() {
         fun setLightTheme(light: Boolean) {
             prefs.edit().putBoolean("light_theme", light).apply()
             runOnUiThread { applyTheme(light) }
+        }
+
+        @JavascriptInterface
+        fun requestNotifications() {
+            runOnUiThread {
+                if (notificationsEnabled()) {
+                    notifyNotificationStatus()
+                    return@runOnUiThread
+                }
+                if (prefs.getBoolean(PREF_NOTIFICATION_PROMPT_DONE, false)) {
+                    openNotificationSettings()
+                } else {
+                    showPermissionRationale()
+                }
+            }
         }
 
         @JavascriptInterface

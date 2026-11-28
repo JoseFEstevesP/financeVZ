@@ -12,6 +12,14 @@ pub struct UpdateProps {
     pub state: Signal<AppState>,
 }
 
+#[cfg(target_os = "android")]
+fn request_notifications() {
+    bridge::request_notifications();
+}
+
+#[cfg(not(target_os = "android"))]
+fn request_notifications() {}
+
 #[component]
 pub fn Update(props: UpdateProps) -> Element {
     let mut state = props.state;
@@ -21,6 +29,10 @@ pub fn Update(props: UpdateProps) -> Element {
     let update_url = snapshot.update_url.clone();
     let update_status = snapshot.update_status.clone();
     let update_downloading = snapshot.update_downloading;
+    #[cfg(target_os = "android")]
+    let show_notifications_button = !snapshot.notifications_enabled;
+    #[cfg(not(target_os = "android"))]
+    let show_notifications_button = false;
     drop(snapshot);
     let (installed_code, installed_name) = platform::local_version();
     let cached_apk = platform::downloaded_apk_path().is_some();
@@ -95,6 +107,14 @@ pub fn Update(props: UpdateProps) -> Element {
                                 }));
                             },
                             "Instalar APK descargado"
+                        }
+                    }
+                    if show_notifications_button {
+                        p { class: "muted", "Los avisos de nuevas versiones están desactivados." }
+                        button {
+                            class: "secondary",
+                            onclick: move |_| request_notifications(),
+                            "Activar avisos de actualización"
                         }
                     }
                     if let Some(message) = status {

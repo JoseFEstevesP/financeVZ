@@ -195,6 +195,8 @@ pub struct AppState {
     pub update_available: Option<String>,
     #[cfg(feature = "self-update")]
     pub update_downloading: bool,
+    #[cfg(feature = "self-update")]
+    pub notifications_enabled: bool,
     pub editing_expense: Option<ExpenseId>,
     pub editing_income: Option<IncomeId>,
     pub budgets: Vec<(CategoryId, i64)>,
@@ -279,6 +281,8 @@ impl AppState {
             update_available: None,
             #[cfg(feature = "self-update")]
             update_downloading: false,
+            #[cfg(feature = "self-update")]
+            notifications_enabled: true,
             editing_expense: None,
             editing_income: None,
             budgets: Vec::new(),

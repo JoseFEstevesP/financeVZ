@@ -22,6 +22,9 @@ enum BridgeMessage {
     #[cfg(feature = "self-update")]
     #[serde(rename = "download_result")]
     DownloadResult { status: String, message: String },
+    #[cfg(feature = "self-update")]
+    #[serde(rename = "notification_status")]
+    NotificationStatus { granted: bool },
     #[serde(rename = "open_settings")]
     OpenSettings,
 }
@@ -42,6 +45,10 @@ pub fn use_bridge(mut state: Signal<AppState>) {
                     #[cfg(feature = "self-update")]
                     BridgeMessage::DownloadResult { status, message } => {
                         state.write().finish_background_download(&status, &message);
+                    }
+                    #[cfg(feature = "self-update")]
+                    BridgeMessage::NotificationStatus { granted } => {
+                        state.write().notifications_enabled = granted;
                     }
                     BridgeMessage::OpenSettings => {
                         state.write().set_view(crate::state::View::Settings);
@@ -93,6 +100,14 @@ pub fn request_background_download(url: &str, sha256: &str, version_code: i64, v
          else if (window.__fvzBridge) window.__fvzBridge.send({{kind:'download_result',status:'error',message:'Descarga en segundo plano no disponible en este dispositivo.'}});"
     );
     dioxus::document::eval(&script);
+}
+
+#[cfg(feature = "self-update")]
+pub fn request_notifications() {
+    dioxus::document::eval(
+        "if (window.FinanzasVZBiometric && window.FinanzasVZBiometric.requestNotifications) \
+         window.FinanzasVZBiometric.requestNotifications();",
+    );
 }
 
 // The channel above stays open for the lifetime of the app; these are one-shot commands.
