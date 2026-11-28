@@ -71,16 +71,16 @@
   },
   {
     "id": "gato",
-    "name": "Gato oscuro",
-    "description": "Tema oscuro con gatos de colores, orejas y colas en botones.",
+    "name": "Gato neón",
+    "description": "Tema oscuro con gatos de colores, formas anguladas y botones con orejas/cola.",
     "is_dark": true,
     "preview": [
-      "#171222",
-      "#2a1b36",
-      "#ff8fab",
-      "#b388eb"
+      "#0f172a",
+      "#18253b",
+      "#22d3ee",
+      "#a3e635"
     ],
-    "version": "1.1.0",
+    "version": "1.2.0",
     "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato.json"
   },
   {
