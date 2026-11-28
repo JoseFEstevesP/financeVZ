@@ -12,6 +12,13 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 - Una versión nueva no se marca como ya notificada cuando el permiso de notificaciones está denegado, para que el aviso aparezca al reactivarlo.
 
+## [0.1.44] - 2026-11-27
+
+### Corregido
+
+- El actualizador limpia APKs temporales y cacheados al volver a la app cuando la versión descargada ya fue instalada.
+- El botón de buscar/descargar actualización se deshabilita mientras hay una descarga en segundo plano en curso para evitar descargas duplicadas.
+
 ## [0.1.43] - 2026-11-27
 
 ### Corregido

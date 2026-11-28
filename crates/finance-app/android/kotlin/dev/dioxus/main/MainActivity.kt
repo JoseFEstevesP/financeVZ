@@ -55,6 +55,34 @@ class MainActivity : WryActivity() {
     override fun onResume() {
         super.onResume()
         checkPendingDownload()
+        cleanupInstalledUpdate()
+    }
+
+    private fun cleanupInstalledUpdate() {
+        try {
+            val updatesDir = File(filesDir, "updates")
+            val versionFile = File(updatesDir, "version-code.txt")
+            val apkFile = File(updatesDir, "financevz.apk")
+            val cachedVersion = if (versionFile.exists()) {
+                versionFile.readText().trim().toLongOrNull()
+            } else null
+            val installedVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageManager.getPackageInfo(packageName, 0).longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+            }
+            if (cachedVersion != null && cachedVersion <= installedVersion) {
+                apkFile.delete()
+                versionFile.delete()
+            }
+            val external = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            if (cachedVersion != null && cachedVersion <= installedVersion) {
+                external?.listFiles()
+                    ?.filter { it.isFile && it.name.startsWith("financevz-update") && it.name.endsWith(".apk") }
+                    ?.forEach { it.delete() }
+            }
+        } catch (_: Exception) {}
     }
 
     private fun restorePendingDownload() {
@@ -78,6 +106,8 @@ class MainActivity : WryActivity() {
             val status = if (statusIdx >= 0) it.getInt(statusIdx) else return
             if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
                 handleDownloadComplete(id)
+            } else {
+                notifyDownload("started", "Descarga en segundo plano en curso…")
             }
         }
     }
@@ -197,6 +227,10 @@ class MainActivity : WryActivity() {
     private var downloadReceiver: BroadcastReceiver? = null
 
     private fun enqueueDownload(url: String, sha256: String, versionCode: Long, versionName: String) {
+        if (pendingDownloadId != -1L) {
+            notifyDownload("started", "Ya hay una descarga en curso. Espera a que termine.")
+            return
+        }
         try {
             val updatesDir = File(filesDir, "updates")
             updatesDir.mkdirs()

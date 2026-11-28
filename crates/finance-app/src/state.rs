@@ -193,6 +193,8 @@ pub struct AppState {
     pub update_status: Option<String>,
     #[cfg(feature = "self-update")]
     pub update_available: Option<String>,
+    #[cfg(feature = "self-update")]
+    pub update_downloading: bool,
     pub editing_expense: Option<ExpenseId>,
     pub editing_income: Option<IncomeId>,
     pub budgets: Vec<(CategoryId, i64)>,
@@ -275,6 +277,8 @@ impl AppState {
             update_status: None,
             #[cfg(feature = "self-update")]
             update_available: None,
+            #[cfg(feature = "self-update")]
+            update_downloading: false,
             editing_expense: None,
             editing_income: None,
             budgets: Vec::new(),
@@ -578,13 +582,16 @@ impl AppState {
     pub fn finish_background_download(&mut self, status: &str, message: &str) {
         match status {
             "started" => {
+                self.update_downloading = true;
                 self.update_status = Some(message.to_owned());
             }
             "completed" => {
+                self.update_downloading = false;
                 self.update_status = Some(message.to_owned());
                 self.refresh();
             }
             _ => {
+                self.update_downloading = false;
                 self.update_status = Some(message.to_owned());
             }
         }

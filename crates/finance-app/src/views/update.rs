@@ -20,6 +20,7 @@ pub fn Update(props: UpdateProps) -> Element {
     let snapshot = state.read();
     let update_url = snapshot.update_url.clone();
     let update_status = snapshot.update_status.clone();
+    let update_downloading = snapshot.update_downloading;
     drop(snapshot);
     let (installed_code, installed_name) = platform::local_version();
     let cached_apk = platform::downloaded_apk_path().is_some();
@@ -101,7 +102,7 @@ pub fn Update(props: UpdateProps) -> Element {
                     }
                     button {
                         class: "secondary",
-                        disabled: progress().is_some(),
+                        disabled: progress().is_some() || update_downloading,
                         onclick: move |_| {
                             let mut target = state;
                             let resolved = {
@@ -129,8 +130,12 @@ pub fn Update(props: UpdateProps) -> Element {
                                         Some("La actualización no incluye SHA-256; no se puede descargar en segundo plano.".into());
                                     return;
                                 }
-                                target.write().update_status =
-                                    Some("Iniciando descarga en segundo plano…".into());
+                                {
+                                    let mut s = target.write();
+                                    s.update_downloading = true;
+                                    s.update_status =
+                                        Some("Iniciando descarga en segundo plano…".into());
+                                }
                                 bridge::request_background_download(
                                     &resolved.apk_url,
                                     &sha,
