@@ -1,0 +1,2 @@
+• Only Dark and Light are built in by default.
+• OLED, Sepia, High contrast, and Commit style moved to the web theme catalog.

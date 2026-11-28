@@ -4,6 +4,12 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.54] - 2026-11-28
+
+### Cambiado
+
+- Temas por defecto reducidos a Oscuro y Claro; OLED, Sepia, Alto contraste y Estilo commit pasan al catálogo web descargable.
+
 ## [0.1.53] - 2026-11-28
 
 ### Añadido

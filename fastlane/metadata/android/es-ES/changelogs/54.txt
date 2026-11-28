@@ -1,0 +1,2 @@
+• Solo Oscuro y Claro vienen por defecto.
+• OLED, Sepia, Alto contraste y Estilo commit ahora se descargan desde el catálogo web.
