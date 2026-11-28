@@ -25,6 +25,8 @@ enum BridgeMessage {
     #[cfg(feature = "self-update")]
     #[serde(rename = "notification_status")]
     NotificationStatus { granted: bool },
+    #[serde(rename = "backup_result")]
+    BackupResult { ok: bool, message: String },
     #[serde(rename = "open_settings")]
     OpenSettings,
 }
@@ -50,6 +52,13 @@ pub fn use_bridge(mut state: Signal<AppState>) {
                     BridgeMessage::NotificationStatus { granted } => {
                         state.write().notifications_enabled = granted;
                     }
+                    BridgeMessage::BackupResult { ok, message } => {
+                        let mut s = state.write();
+                        s.feedback = Some(message);
+                        if ok {
+                            s.import_input.clear();
+                        }
+                    }
                     BridgeMessage::OpenSettings => {
                         state.write().set_view(crate::state::View::Settings);
                     }
@@ -70,7 +79,9 @@ pub fn request_toast_clear() {
 
 pub fn request_backup_download(json: &str) {
     let payload = serde_json::to_string(json).unwrap_or_else(|_| "\"\"".to_owned());
-    let script = format!("if (window.__fvzDownloadBackup) window.__fvzDownloadBackup({payload});");
+    let script = format!(
+        "if (window.FinanzasVZBiometric && window.FinanzasVZBiometric.saveBackup)          window.FinanzasVZBiometric.saveBackup({payload});          else if (window.__fvzDownloadBackup) window.__fvzDownloadBackup({payload});"
+    );
     dioxus::document::eval(&script);
 }
 

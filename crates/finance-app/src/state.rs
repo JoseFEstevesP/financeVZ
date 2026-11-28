@@ -1774,8 +1774,9 @@ impl AppState {
                 .map_err(|error| error.to_string())
         }) {
             Ok((json, summary)) => {
-                self.import_input = json.clone();
-                self.feedback = Some(format!("Copia preparada: {summary}."));
+                self.feedback = Some(format!(
+                    "Copia lista ({summary}). Selecciona dónde guardarla."
+                ));
                 Some(json)
             }
             Err(error) => {
@@ -1973,7 +1974,7 @@ impl AppState {
         }
     }
 
-    pub fn auto_backup_now(&mut self) {
+    pub fn auto_backup_now(&mut self) -> Option<String> {
         let result = self
             .repo
             .lock()
@@ -1981,10 +1982,29 @@ impl AppState {
             .and_then(|repo| {
                 auto_backup(&repo, true).ok_or_else(|| "No se pudo guardar".to_owned())
             });
-        self.feedback = Some(match result {
-            Ok(path) => format!("Copia automática guardada en {path}"),
-            Err(error) => format!("No se pudo crear la copia: {error}"),
-        });
+        match result {
+            Ok(path) => {
+                self.feedback = Some(format!(
+                    "Copia automática guardada en almacenamiento privado de la app ({path})."
+                ));
+                std::fs::read_to_string(&path).ok()
+            }
+            Err(error) => {
+                self.feedback = Some(format!("No se pudo crear la copia: {error}"));
+                None
+            }
+        }
+    }
+
+    pub fn latest_auto_backup_json(&mut self) -> Option<String> {
+        let path = platform::latest_auto_backup_path()?;
+        match std::fs::read_to_string(&path) {
+            Ok(json) => Some(json),
+            Err(error) => {
+                self.feedback = Some(format!("No se pudo leer la copia automática: {error}"));
+                None
+            }
+        }
     }
 
     pub fn show_evidence(&mut self, path: &str) {

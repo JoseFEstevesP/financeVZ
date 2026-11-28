@@ -137,6 +137,24 @@ class MainActivity : WryActivity() {
         }
     }
 
+    private var pendingBackupJson: String? = null
+
+    private val createBackupLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        val json = pendingBackupJson
+        pendingBackupJson = null
+        if (uri == null || json == null) return@registerForActivityResult
+        try {
+            contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+            }
+            notifyBackupResult(true, "Copia exportada correctamente.")
+        } catch (e: Exception) {
+            notifyBackupResult(false, "No se pudo guardar la copia: ${e.message ?: "error"}")
+        }
+    }
+
     override fun onWebViewCreate(view: WebView) {
         webView = view
         view.settings.textZoom = 100
@@ -247,43 +265,14 @@ class MainActivity : WryActivity() {
         }
     }
 
-    inner class FinanzasVZBridge {
-        @JavascriptInterface
-        fun authenticate(action: String) {
-            runOnUiThread { showBiometricPrompt(action) }
-        }
-
-        @JavascriptInterface
-        fun setLightTheme(light: Boolean) {
-            prefs.edit().putBoolean("light_theme", light).apply()
-            runOnUiThread { applyTheme(light) }
-        }
-
-        @JavascriptInterface
-        fun requestNotifications() {
-            runOnUiThread {
-                if (notificationsEnabled()) {
-                    notifyNotificationStatus()
-                    return@runOnUiThread
-                }
-                if (prefs.getBoolean(PREF_NOTIFICATION_PROMPT_DONE, false)) {
-                    openNotificationSettings()
-                } else {
-                    showPermissionRationale()
-                }
-            }
-        }
-
-        @JavascriptInterface
-        fun downloadUpdate(url: String, sha256: String, versionCode: Long, versionName: String) {
-            runOnUiThread { enqueueDownload(url, sha256, versionCode, versionName) }
-        }
-    }
-
     private var pendingDownloadId: Long = -1L
     private var pendingSha256: String = ""
     private var pendingVersionCode: Long = 0L
     private var downloadReceiver: BroadcastReceiver? = null
+
+    private fun startUpdateDownload(url: String, sha256: String, versionCode: Long, versionName: String) {
+        enqueueDownload(url, sha256, versionCode, versionName)
+    }
 
     private fun enqueueDownload(url: String, sha256: String, versionCode: Long, versionName: String) {
         if (pendingDownloadId != -1L) {
@@ -449,6 +438,16 @@ class MainActivity : WryActivity() {
         }
     }
 
+    private fun notifyBackupResult(ok: Boolean, message: String) {
+        webView?.post {
+            val payload = JSONObject()
+                .put("kind", "backup_result")
+                .put("ok", ok)
+                .put("message", message)
+            webView?.evaluateJavascript("window.__fvzBridge && window.__fvzBridge.send($payload)", null)
+        }
+    }
+
     override fun onDestroy() {
         downloadReceiver?.let {
             try { unregisterReceiver(it) } catch (_: Exception) {}
@@ -499,6 +498,56 @@ class MainActivity : WryActivity() {
                 .put("ok", ok)
                 .put("message", message)
             webView?.evaluateJavascript("window.__fvzBridge.send($payload)", null)
+        }
+    }
+
+    inner class FinanzasVZBridge {
+        @JavascriptInterface
+        fun authenticate(action: String) {
+            runOnUiThread { showBiometricPrompt(action) }
+        }
+
+        @JavascriptInterface
+        fun setLightTheme(light: Boolean) {
+            prefs.edit().putBoolean("light_theme", light).apply()
+            runOnUiThread { applyTheme(light) }
+        }
+
+        @JavascriptInterface
+        fun saveBackup(json: String) {
+            runOnUiThread {
+                pendingBackupJson = json
+                val name = "financevz-backup-" +
+                    java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                        .format(java.util.Date()) + ".json"
+                try {
+                    createBackupLauncher.launch(name)
+                } catch (e: Exception) {
+                    pendingBackupJson = null
+                    notifyBackupResult(false, "No se pudo abrir el guardado: ${e.message ?: "error"}")
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun downloadUpdate(url: String, sha256: String, versionCode: Long, versionName: String) {
+            runOnUiThread { startUpdateDownload(url, sha256, versionCode, versionName) }
+        }
+
+        @JavascriptInterface
+        fun requestNotifications() {
+            runOnUiThread {
+                prefs.edit().putBoolean(PREF_NOTIFICATION_PROMPT_DONE, false).apply()
+                if (!notificationsEnabled()) {
+                    ActivityCompat.requestPermissions(
+                        this@MainActivity,
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                        REQUEST_POST_NOTIFICATIONS
+                    )
+                } else {
+                    notifyNotificationStatus()
+                }
+            }
         }
     }
 }

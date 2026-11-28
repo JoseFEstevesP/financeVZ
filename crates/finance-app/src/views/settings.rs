@@ -124,7 +124,7 @@ pub fn Settings(props: SettingsProps) -> Element {
                 h4 { class: "subheading", "Copia automática" }
                 p { class: "muted", "{auto_backup_status}" }
                 p { class: "muted",
-                    "Se guarda en la carpeta privada de la app y se conservan las últimas 3 copias."
+                    "Se guarda en la carpeta privada de la app y se conservan las últimas 3 copias. Para sacarla, usa «Exportar última copia automática»."
                 }
                 div { class: "row-buttons",
                     for hours in [6_i64, 12, 24, 48] {
@@ -135,10 +135,28 @@ pub fn Settings(props: SettingsProps) -> Element {
                         }
                     }
                 }
-                button {
-                    class: "secondary spaced",
-                    onclick: move |_| app_state.write().auto_backup_now(),
-                    "Crear copia automática ahora"
+                div { class: "row-buttons",
+                    button {
+                        class: "secondary spaced",
+                        onclick: move |_| {
+                            let json = app_state.write().auto_backup_now();
+                            if let Some(json) = json {
+                                bridge::request_backup_download(&json);
+                            }
+                        },
+                        "Crear y exportar copia ahora"
+                    }
+                    button {
+                        class: "secondary spaced",
+                        onclick: move |_| {
+                            if let Some(json) = app_state.write().latest_auto_backup_json() {
+                                bridge::request_backup_download(&json);
+                            } else {
+                                app_state.write().feedback = Some("No hay copia automática para exportar.".into());
+                            }
+                        },
+                        "Exportar última copia automática"
+                    }
                 }
             }
 

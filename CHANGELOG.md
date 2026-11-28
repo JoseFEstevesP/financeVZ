@@ -4,6 +4,13 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.50] - 2026-11-28
+
+### Corregido
+
+- Exportar copia ya abre el selector de guardado de Android (SAF) para elegir carpeta/archivo, en vez de volcar el JSON en pantalla.
+- Copias automáticas: se puede crear y exportar, o exportar la última copia guardada en almacenamiento privado.
+
 ## [0.1.48] - 2026-11-28
 
 ### Corregido

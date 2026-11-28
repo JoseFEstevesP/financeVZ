@@ -1,0 +1,2 @@
+• Export backup opens Android save dialog to pick folder/file.
+• Auto backups: create and export, or export the latest one.

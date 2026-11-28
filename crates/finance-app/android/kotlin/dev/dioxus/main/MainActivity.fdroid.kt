@@ -22,6 +22,24 @@ class MainActivity : WryActivity() {
         applyTheme(prefs.getBoolean("light_theme", false))
     }
 
+    private var pendingBackupJson: String? = null
+
+    private val createBackupLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        val json = pendingBackupJson
+        pendingBackupJson = null
+        if (uri == null || json == null) return@registerForActivityResult
+        try {
+            contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+            }
+            notifyBackupResult(true, "Copia exportada correctamente.")
+        } catch (e: Exception) {
+            notifyBackupResult(false, "No se pudo guardar la copia: ${e.message ?: "error"}")
+        }
+    }
+
     override fun onWebViewCreate(view: WebView) {
         webView = view
         view.settings.textZoom = 100
@@ -53,6 +71,22 @@ class MainActivity : WryActivity() {
             runOnUiThread {
                 prefs.edit().putBoolean("light_theme", light).apply()
                 applyTheme(light)
+            }
+        }
+
+        @JavascriptInterface
+        fun saveBackup(json: String) {
+            runOnUiThread {
+                pendingBackupJson = json
+                val name = "financevz-backup-" +
+                    java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                        .format(java.util.Date()) + ".json"
+                try {
+                    createBackupLauncher.launch(name)
+                } catch (e: Exception) {
+                    pendingBackupJson = null
+                    notifyBackupResult(false, "No se pudo abrir el guardado: ${e.message ?: "error"}")
+                }
             }
         }
     }
@@ -96,6 +130,16 @@ class MainActivity : WryActivity() {
             val payload = JSONObject()
                 .put("kind", "biometric_result")
                 .put("action", action)
+                .put("ok", ok)
+                .put("message", message)
+            webView?.evaluateJavascript("window.__fvzBridge && window.__fvzBridge.send($payload)", null)
+        }
+    }
+
+    private fun notifyBackupResult(ok: Boolean, message: String) {
+        webView?.post {
+            val payload = JSONObject()
+                .put("kind", "backup_result")
                 .put("ok", ok)
                 .put("message", message)
             webView?.evaluateJavascript("window.__fvzBridge && window.__fvzBridge.send($payload)", null)

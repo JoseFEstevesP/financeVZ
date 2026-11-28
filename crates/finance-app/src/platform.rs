@@ -800,15 +800,9 @@ pub fn database_path() -> Result<PathBuf, String> {
     Ok(app_files_dir()?.join("financevz.db"))
 }
 
-/// Guarda el JSON de la copia en la carpeta privada y conserva solo las últimas `keep`.
-pub fn write_auto_backup(json: &str, keep: usize) -> Option<String> {
+fn auto_backup_files() -> Option<Vec<PathBuf>> {
     let dir = app_files_dir().ok()?.join("backups");
-    std::fs::create_dir_all(&dir).ok()?;
-    let filename = format!("financevz-{}.json", Local::now().format("%Y%m%d-%H%M%S"));
-    let path = dir.join(filename);
-    std::fs::write(&path, json).ok()?;
-
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+    let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
         .ok()?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|candidate| {
@@ -820,7 +814,26 @@ pub fn write_auto_backup(json: &str, keep: usize) -> Option<String> {
         })
         .collect();
     files.sort_by(|left, right| right.cmp(left));
-    for stale in files.into_iter().skip(keep) {
+    Some(files)
+}
+
+pub fn latest_auto_backup_path() -> Option<PathBuf> {
+    auto_backup_files()?.into_iter().next()
+}
+
+/// Guarda el JSON de la copia en la carpeta privada y conserva solo las últimas `keep`.
+pub fn write_auto_backup(json: &str, keep: usize) -> Option<String> {
+    let dir = app_files_dir().ok()?.join("backups");
+    std::fs::create_dir_all(&dir).ok()?;
+    let filename = format!("financevz-{}.json", Local::now().format("%Y%m%d-%H%M%S"));
+    let path = dir.join(filename);
+    std::fs::write(&path, json).ok()?;
+
+    for stale in auto_backup_files()
+        .unwrap_or_default()
+        .into_iter()
+        .skip(keep)
+    {
         let _ = std::fs::remove_file(stale);
     }
     Some(path.to_string_lossy().into_owned())

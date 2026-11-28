@@ -1,0 +1,2 @@
+• Exportar copia abre el selector de carpeta/archivo en Android.
+• Copias automáticas: crear y exportar, o exportar la última.
