@@ -45,7 +45,9 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) : Worker(
             if (notified == info.versionCode) return Result.success()
 
             showUpdateNotification(applicationContext, info.versionName, info.versionCode)
-            prefs.edit().putLong("notified_update_version", info.versionCode).apply()
+            if (notificationsEnabled(applicationContext)) {
+                prefs.edit().putLong("notified_update_version", info.versionCode).apply()
+            }
             Result.success()
         } catch (_: Exception) {
             Result.success()
@@ -111,12 +113,16 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) : Worker(
         }
     }
 
+    private fun notificationsEnabled(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
     private fun showUpdateNotification(context: Context, versionName: String, versionCode: Long) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                return
-            }
-        }
+        if (!notificationsEnabled(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "Actualizaciones", NotificationManager.IMPORTANCE_DEFAULT)

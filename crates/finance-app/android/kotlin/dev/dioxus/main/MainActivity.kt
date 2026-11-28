@@ -1,6 +1,7 @@
 package dev.dioxus.main
 
 import android.Manifest
+import android.app.AlertDialog
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -30,6 +31,11 @@ typealias BuildConfig = com.gato99.financevz.BuildConfig
 class MainActivity : WryActivity() {
     private var webView: WebView? = null
     private val prefs by lazy { getSharedPreferences("finanzasvz", MODE_PRIVATE) }
+
+    companion object {
+        private const val REQUEST_POST_NOTIFICATIONS = 2201
+        private const val PREF_NOTIFICATION_PROMPT_DONE = "notification_prompt_done"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,7 +107,56 @@ class MainActivity : WryActivity() {
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2201)
+        if (prefs.getBoolean(PREF_NOTIFICATION_PROMPT_DONE, false)) return
+        showPermissionRationale()
+    }
+
+    private fun showPermissionRationale() {
+        AlertDialog.Builder(this)
+            .setTitle("Avisos de actualización")
+            .setMessage("finanzasVZ solo envía avisos cuando publica una versión nueva; nunca envía datos ni publicidad. Sin este permiso la app sigue funcionando, pero no podrá avisarte.")
+            .setPositiveButton("Permitir") { _, _ ->
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_POST_NOTIFICATIONS
+                )
+            }
+            .setNegativeButton("Ahora no") { _, _ ->
+                prefs.edit().putBoolean(PREF_NOTIFICATION_PROMPT_DONE, true).apply()
+            }
+            .show()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_POST_NOTIFICATIONS) return
+        prefs.edit().putBoolean(PREF_NOTIFICATION_PROMPT_DONE, true).apply()
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) return
+        AlertDialog.Builder(this)
+            .setTitle("Avisos desactivados")
+            .setMessage("No recibirás avisos de nuevas versiones. Puedes activarlos en Ajustes del sistema → Notificaciones → finanzasVZ.")
+            .setPositiveButton("Abrir ajustes") { _, _ -> openNotificationSettings() }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+        } else {
+            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:$packageName"))
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+        }
     }
 
     private fun applyTheme(light: Boolean) {
