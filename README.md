@@ -176,3 +176,7 @@ cargo test --workspace --no-default-features
 ```
 
 La suite actual son 43 pruebas repartidas en los tres crates (incluye migraciones, copia de seguridad, verificación de checksum y formato de fechas). También se puede ejecutar con el listado explícito: `cargo test -p finance-core -p finance-store -p finance-app --no-default-features`. Los mismos pasos de formato, clippy y tests se ejecutan en `.github/workflows/ci.yml`.
+
+## Licencia
+
+Este proyecto se distribuye bajo la licencia [GNU GPL v3.0](LICENSE) (`GPL-3.0-only`).

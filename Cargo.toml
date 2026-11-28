@@ -4,7 +4,7 @@ members = ["crates/finance-core", "crates/finance-store", "crates/finance-app"]
 
 [workspace.package]
 edition = "2024"
-license = "private"
+license = "GPL-3.0-only"
 publish = false
 
 [workspace.dependencies]
