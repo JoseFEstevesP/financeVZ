@@ -1,0 +1,2 @@
+• Activity and home now show total balance and balance after each movement.
+• Updater and update notification fixes.

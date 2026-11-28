@@ -1,0 +1,20 @@
+financeVZ es una app de finanzas personales para Android. Registra gastos e ingresos, controla pagos recurrentes y presupuestos, y consulta reportes claros. Tus datos se guardan en tu teléfono, sin cuentas ni servidor propio.
+
+Qué puedes hacer:
+• Registrar y editar gastos e ingresos con categoría, método, nota y evidencia.
+• Ver saldo total y saldo después de cada movimiento, estilo banco.
+• Llevar pagos recurrentes, cuotas y compras Cashea.
+• Definir presupuestos mensuales por categoría.
+• Ver reportes, balances por categoría e historial de tasa.
+• Proteger el acceso con PIN o huella.
+• Exportar/importar copias JSON y crear copias automáticas locales.
+
+Moneda:
+• Los importes se guardan en USD (centavos).
+• La conversión a bolívares es solo visual, con tasa del día (DolarAPI/BCV).
+
+Privacidad:
+• Sin cuentas, sin anuncios, sin analítica.
+• Los datos se guardan localmente en SQLite.
+
+Código fuente: https://github.com/JoseFEstevesP/financeVZ

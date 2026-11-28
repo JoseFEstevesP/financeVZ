@@ -1,0 +1,2 @@
+• El historial y el inicio muestran el saldo total y el saldo después de cada movimiento.
+• Correcciones del actualizador y avisos de actualización.
