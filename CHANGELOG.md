@@ -4,6 +4,17 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.53] - 2026-11-28
+
+### Añadido
+
+- Nuevos temas descargables: Dragon Ball, Naruto, Gato y Perro.
+- Soporte `extra_css` en temas descargables para personalizar contenedores/bordes/radios además de colores.
+
+### Cambiado
+
+- Catálogo web y landing actualizados para mostrar los nuevos temas.
+
 ## [0.1.52] - 2026-11-28
 
 ### Añadido

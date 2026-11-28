@@ -1,0 +1,2 @@
+• New themes: Dragon Ball, Naruto, Cat, and Dog.
+• Downloadable themes can now style containers, not just colors.
