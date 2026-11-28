@@ -56,7 +56,7 @@ pub fn Settings(props: SettingsProps) -> Element {
             div { class: "card",
                 h3 { "Tema" }
                 p { class: "muted",
-                    "Elige el estilo visual de la app. Puedes descargar más temas desde la web."
+                    "Elige el estilo visual de la app. Por defecto solo están Oscuro y Claro. Descarga más temas desde la web."
                 }
                 div { class: "theme-grid",
                     for theme in themes.iter().cloned() {

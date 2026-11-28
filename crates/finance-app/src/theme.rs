@@ -49,38 +49,6 @@ pub fn builtin_themes() -> Vec<ThemeDef> {
             false,
             ["#f7f9fd", "#ffffff", "#316cdb", "#0f9d78"],
         ),
-        builtin(
-            "oled",
-            "OLED negro",
-            "Negro puro, ideal para pantallas OLED.",
-            "theme-oled",
-            true,
-            ["#000000", "#101010", "#4f8cff", "#2dd4a7"],
-        ),
-        builtin(
-            "sepia",
-            "Sepia",
-            "Tonos cálidos para lectura cómoda.",
-            "theme-sepia",
-            false,
-            ["#f4ecd8", "#fff8e8", "#8b5e34", "#5f8f3a"],
-        ),
-        builtin(
-            "high-contrast",
-            "Alto contraste",
-            "Máxima legibilidad y contraste.",
-            "theme-high-contrast",
-            true,
-            ["#000000", "#111111", "#00aaff", "#00ff88"],
-        ),
-        builtin(
-            "commit",
-            "Estilo commit",
-            "Inspirado en terminal/git, con acentos verdes.",
-            "theme-commit",
-            true,
-            ["#0d1117", "#161b22", "#238636", "#58a6ff"],
-        ),
     ]
 }
 
@@ -209,14 +177,11 @@ pub fn remove_installed_theme(id: &str) -> Result<(), String> {
 
 pub fn validate_theme(theme: &ThemeDef) -> Result<(), String> {
     let id = sanitize_id(&theme.id).ok_or_else(|| "ID de tema inválido".to_owned())?;
-    if id == "dark"
-        || id == "light"
-        || id == "oled"
-        || id == "sepia"
-        || id == "high-contrast"
-        || id == "commit"
-    {
-        // allow builtin IDs only when marked builtin? installed cannot override
+    if theme.builtin && id != "dark" && id != "light" {
+        return Err("Solo oscuro y claro pueden ser temas integrados".to_owned());
+    }
+    if !theme.builtin && (id == "dark" || id == "light") {
+        return Err("No se puede reemplazar un tema integrado".to_owned());
     }
     if theme.name.trim().is_empty() {
         return Err("El tema no tiene nombre".to_owned());
@@ -337,10 +302,10 @@ mod tests {
         let themes = builtin_themes();
         assert_eq!(resolve("dark", &themes).id, "dark");
         assert_eq!(resolve("light", &themes).id, "light");
-        assert_eq!(resolve("oled-black", &themes).id, "oled");
-        assert_eq!(resolve("sepia", &themes).id, "sepia");
-        assert_eq!(resolve("high_contrast", &themes).id, "high-contrast");
-        assert_eq!(resolve("commit", &themes).id, "commit");
+        // aliases normalize; resolve falls back to dark if not installed
+        assert_eq!(normalize_id("oled-black"), "oled");
+        assert_eq!(normalize_id("high_contrast"), "high-contrast");
+        assert_eq!(resolve("oled-black", &themes).id, "dark");
     }
 
     #[test]

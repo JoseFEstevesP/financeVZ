@@ -96,5 +96,61 @@
     ],
     "version": "1.0.0",
     "download_url": "https://josefestevesp.github.io/financeVZ/themes/perro.json"
+  },
+  {
+    "id": "oled",
+    "name": "OLED negro",
+    "description": "Negro puro, ideal para pantallas OLED.",
+    "is_dark": true,
+    "preview": [
+      "#000000",
+      "#101010",
+      "#4f8cff",
+      "#2dd4a7"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/oled.json"
+  },
+  {
+    "id": "sepia",
+    "name": "Sepia",
+    "description": "Tonos cálidos para lectura cómoda.",
+    "is_dark": false,
+    "preview": [
+      "#f4ecd8",
+      "#fff8e8",
+      "#8b5e34",
+      "#5f8f3a"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/sepia.json"
+  },
+  {
+    "id": "high-contrast",
+    "name": "Alto contraste",
+    "description": "Máxima legibilidad y contraste.",
+    "is_dark": true,
+    "preview": [
+      "#000000",
+      "#111111",
+      "#00aaff",
+      "#00ff88"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/high-contrast.json"
+  },
+  {
+    "id": "commit",
+    "name": "Estilo commit",
+    "description": "Inspirado en terminal/git, con acentos verdes.",
+    "is_dark": true,
+    "preview": [
+      "#0d1117",
+      "#161b22",
+      "#238636",
+      "#58a6ff"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/commit.json"
   }
 ]
