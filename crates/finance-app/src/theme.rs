@@ -12,6 +12,8 @@ pub struct ThemeDef {
     #[serde(default)]
     pub vars: std::collections::BTreeMap<String, String>,
     #[serde(default)]
+    pub extra_css: String,
+    #[serde(default)]
     pub builtin: bool,
 }
 
@@ -98,6 +100,7 @@ fn builtin(
         is_dark,
         preview: preview.map(|c| c.to_owned()),
         vars: std::collections::BTreeMap::new(),
+        extra_css: String::new(),
         builtin: true,
     }
 }
@@ -223,6 +226,9 @@ pub fn validate_theme(theme: &ThemeDef) -> Result<(), String> {
     }
     for c in &theme.preview {
         validate_color(c)?;
+    }
+    if theme.extra_css.len() > 16_000 {
+        return Err("El CSS extra del tema es demasiado grande".to_owned());
     }
     if !theme.builtin {
         if theme.vars.is_empty() {
@@ -363,6 +369,7 @@ mod tests {
                 "#445566".to_owned(),
             ],
             vars,
+            extra_css: String::new(),
             builtin: false,
         };
         assert!(validate_theme(&theme).is_ok());

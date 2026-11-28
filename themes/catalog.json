@@ -40,5 +40,61 @@
     ],
     "version": "1.0.0",
     "download_url": "https://josefestevesp.github.io/financeVZ/themes/solarized-light.json"
+  },
+  {
+    "id": "dragon-ball",
+    "name": "Dragon Ball",
+    "description": "Energía naranja y dorada, con contenedores dinámicos.",
+    "is_dark": true,
+    "preview": [
+      "#1a0f00",
+      "#2b1600",
+      "#ff7a00",
+      "#ffd000"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/dragon-ball.json"
+  },
+  {
+    "id": "naruto",
+    "name": "Naruto",
+    "description": "Naranja ninja, oscuro y con bordes afilados.",
+    "is_dark": true,
+    "preview": [
+      "#111216",
+      "#1c1f26",
+      "#ff8a00",
+      "#e53935"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/naruto.json"
+  },
+  {
+    "id": "gato",
+    "name": "Gato",
+    "description": "Suave, redondeado y pastel, con vibra felina.",
+    "is_dark": false,
+    "preview": [
+      "#fff7fb",
+      "#ffeef6",
+      "#b388eb",
+      "#ff8fab"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato.json"
+  },
+  {
+    "id": "perro",
+    "name": "Perro",
+    "description": "Cálido, amigable y robusto, con tonos tierra.",
+    "is_dark": false,
+    "preview": [
+      "#fffaf3",
+      "#f5ead7",
+      "#8b5e3c",
+      "#4c8c4a"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/perro.json"
   }
 ]
