@@ -72,7 +72,7 @@
   {
     "id": "gato",
     "name": "Gato neón",
-    "description": "Tema oscuro con gatos de colores, formas anguladas y botones con orejas/cola.",
+    "description": "Oscuro con gatos de colores, orejas redondeadas y cola.",
     "is_dark": true,
     "preview": [
       "#0f172a",
@@ -80,7 +80,7 @@
       "#22d3ee",
       "#a3e635"
     ],
-    "version": "1.2.0",
+    "version": "1.3.0",
     "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato.json"
   },
   {
@@ -152,5 +152,33 @@
     ],
     "version": "1.0.0",
     "download_url": "https://josefestevesp.github.io/financeVZ/themes/commit.json"
+  },
+  {
+    "id": "gato-morado",
+    "name": "Gato Morado",
+    "description": "Variante morada: gatos curiosos, orejas redondeadas y cola suave.",
+    "is_dark": true,
+    "preview": [
+      "#0f172a",
+      "#1e1b4b",
+      "#a78bfa",
+      "#67e8f9"
+    ],
+    "version": "1.3.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato-morado.json"
+  },
+  {
+    "id": "gato-naranja",
+    "name": "Gato Ámbar",
+    "description": "Variante cálida: gatos juguetones, orejas redondeadas y cola.",
+    "is_dark": true,
+    "preview": [
+      "#0f172a",
+      "#2b1a10",
+      "#fb923c",
+      "#fde047"
+    ],
+    "version": "1.3.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato-naranja.json"
   }
 ]
