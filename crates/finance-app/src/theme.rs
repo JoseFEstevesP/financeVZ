@@ -278,6 +278,29 @@ pub const REQUIRED_VARS: &[&str] = &[
     "--shadow",
 ];
 
+pub fn sanitize_extra_css(css: &str) -> String {
+    if css.trim().is_empty() {
+        return String::new();
+    }
+    let lowered = css.to_ascii_lowercase();
+    for bad in [
+        "</style",
+        "<script",
+        "javascript:",
+        "@import",
+        "expression(",
+        "url(javascript",
+    ] {
+        if lowered.contains(bad) {
+            return String::new();
+        }
+    }
+    css.chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t' || *c == '\r')
+        .take(64_000)
+        .collect()
+}
+
 pub fn css_for_installed(themes: &[ThemeDef]) -> String {
     let mut out = String::new();
     for theme in themes.iter().filter(|t| !t.builtin) {
@@ -289,6 +312,13 @@ pub fn css_for_installed(themes: &[ThemeDef]) -> String {
             out.push_str(&format!("  {k}: {v};\n"));
         }
         out.push_str("}\n");
+        let extra = sanitize_extra_css(&theme.extra_css);
+        if !extra.is_empty() {
+            out.push_str(&extra);
+            if !extra.ends_with('\n') {
+                out.push('\n');
+            }
+        }
     }
     out
 }

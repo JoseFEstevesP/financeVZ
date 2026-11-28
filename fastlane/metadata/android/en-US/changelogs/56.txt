@@ -1,0 +1,2 @@
+• Fixes downloadable themes: extra CSS/SVG shapes and button/container styles now apply.
+• Neon Cat theme: dark, colorful cats, angled shapes, and ear/tail buttons.

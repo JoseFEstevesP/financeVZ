@@ -1,0 +1,2 @@
+• Corrige temas descargables: ya aplican formas/SVGs y estilos de botones/contenedores.
+• Tema Gato neón: oscuro, gatos de colores, formas anguladas y orejas/cola en botones.

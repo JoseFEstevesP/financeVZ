@@ -4,6 +4,16 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.56] - 2026-11-28
+
+### Corregido
+
+- Inyección de `extra_css` en temas descargables: ahora se aplican formas, SVGs y pseudo-elementos de contenedores/botones.
+
+### Cambiado
+
+- Tema Gato rehacho como "Gato neón": oscuro, gatos SVG coloridos, contenedores angulados y botones con orejas/cola.
+
 ## [0.1.54] - 2026-11-28
 
 ### Cambiado
