@@ -4,6 +4,17 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.47] - 2026-11-28
+
+### Cambiado
+
+- **Cambio incompatible**: el identificador de aplicación Android pasa de `com.gato99.financevz` a `com.joseE.financevz`. Las instalaciones anteriores no se actualizan encima; hay que desinstalar/instalar o migrar datos.
+
+### Añadido
+
+- Metadatos fastlane (es-ES/en-US) para distribución en F-Droid.
+- `FINANCEVZ_FDROID=1` en `scripts/build-release.sh` genera APK release sin firma del proyecto y sin escribir `updates/`.
+
 ## [0.1.46] - 2026-11-27
 
 ### Añadido

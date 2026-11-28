@@ -1,0 +1,2 @@
+• Breaking: app ID changed to com.joseE.financevz; reinstall/migrate data.
+• F-Droid metadata and F-Droid build without project signing.

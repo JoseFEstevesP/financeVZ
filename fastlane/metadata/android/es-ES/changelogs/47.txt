@@ -1,0 +1,2 @@
+• Cambio incompatible: nuevo identificador de app (com.joseE.financevz); reinstalar/migrar datos.
+• Metadatos F-Droid y build F-Droid sin firma del proyecto.
