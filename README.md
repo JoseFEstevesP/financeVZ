@@ -87,9 +87,19 @@ El script seleccionado:
 1. Incrementa el `versionCode` leyendo `crates/finance-app/android/version-code.txt` y deriva el `versionName` como `0.1.<code>`.
 2. Copia la configuración XML de Android, el `MainActivity.kt` y el icono de marca al proyecto generado por `dx` (tras el build se inyecta también la dependencia `androidx.biometric` en el Gradle generado).
 3. Ejecuta `dx build --android -p finance-app --target <target>` y `gradlew assembleDebug` o `assembleRelease` según `MODE`.
-4. Copia el APK a `updates/financevz.apk`, escribe `updates/update.json` con su SHA-256 y actualiza el archivo de versión.
+4. En build GitHub/debug copia el APK a `updates/financevz.apk`, escribe `updates/update.json` con su SHA-256 y actualiza el archivo de versión. En build F-Droid no escribe `updates/`.
 
-El script **no instala** el APK: instala `updates/financevz.apk` en el dispositivo (por ejemplo, con `adb install -r updates/financevz.apk`). Al terminar imprime la URL local, por si decides usar el servidor en opciones avanzadas.
+El script **no instala** el APK: instala el APK generado en el dispositivo (por ejemplo, con `adb install -r <ruta-apk>`).
+
+## Build F-Droid
+
+La variante F-Droid compila sin auto-actualizador, sin `REQUEST_INSTALL_PACKAGES`, sin WorkManager/notificaciones de actualización y con cleartext deshabilitado. La actualización queda a cargo de la tienda.
+
+```bash
+FINANCEVZ_FDROID=1 bash scripts/build-release.sh
+```
+
+Este modo usa `--no-default-features --features mobile` y no requiere keystore del proyecto: genera un APK release sin firmar por el proyecto (`app-release-unsigned.apk` o el release generado por Gradle), para que F-Droid lo firme con su propia clave. No actualiza `updates/update.json`.
 
 ## Actualizaciones
 
@@ -153,6 +163,8 @@ scripts/build.sh                   # genera updates/financevz.apk + update.json 
 ```
 
 Las contraseñas se exportan desde `.env` y Gradle las lee del entorno; no se escriben en archivos versionados ni se muestran en los logs. El `.env` está en `.gitignore`: no lo subas al repo. Haz una copia segura del keystore y de las contraseñas: sin ellos no podrás firmar futuras actualizaciones.
+
+Para F-Droid, usa `FINANCEVZ_FDROID=1 bash scripts/build-release.sh`; ese modo no requiere keystore del proyecto y no escribe `updates/update.json`.
 
 ## Configuración
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Build Android firmado para distribución fuera de Play Store.
-# Requiere FINANCEVZ_KEYSTORE_PATH, FINANCEVZ_KEYSTORE_PASSWORD,
-# FINANCEVZ_KEY_PASSWORD y FINANCEVZ_KEY_ALIAS (ver setup-keystore.sh).
+# Build Android release. Por defecto firma con FINANCEVZ_KEYSTORE_* (ver setup-keystore.sh).
+# Con FINANCEVZ_FDROID=1 genera la variante F-Droid sin auto-actualizador y sin firma del proyecto.
 set -euo pipefail
 
 ROOT="$(env -u CDPATH cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,17 +11,20 @@ export NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
 export ANDROID_NDK_HOME="$NDK_HOME"
 export JAVA_HOME="$HOME/.local/share/financeVZ-toolchain/jdk"
 
-for name in FINANCEVZ_KEYSTORE_PATH FINANCEVZ_KEYSTORE_PASSWORD FINANCEVZ_KEY_PASSWORD; do
-    if [[ -z "${!name:-}" ]]; then
-        echo "Falta la variable de entorno $name. Consulta scripts/setup-keystore.sh" >&2
+FDROID="${FINANCEVZ_FDROID:-0}"
+if [ "$FDROID" != "1" ]; then
+    for name in FINANCEVZ_KEYSTORE_PATH FINANCEVZ_KEYSTORE_PASSWORD FINANCEVZ_KEY_PASSWORD; do
+        if [[ -z "${!name:-}" ]]; then
+            echo "Falta la variable de entorno $name. Consulta scripts/setup-keystore.sh" >&2
+            exit 1
+        fi
+    done
+    KEY_ALIAS="${FINANCEVZ_KEY_ALIAS:-financevz}"
+    [[ -f "$FINANCEVZ_KEYSTORE_PATH" ]] || {
+        echo "No existe el keystore: $FINANCEVZ_KEYSTORE_PATH" >&2
         exit 1
-    fi
-done
-KEY_ALIAS="${FINANCEVZ_KEY_ALIAS:-financevz}"
-[[ -f "$FINANCEVZ_KEYSTORE_PATH" ]] || {
-    echo "No existe el keystore: $FINANCEVZ_KEYSTORE_PATH" >&2
-    exit 1
-}
+    }
+fi
 
 TARGET="${1:-aarch64-linux-android}"
 cd "$ROOT"
@@ -32,7 +34,6 @@ ANDROID_RES="$ROOT/crates/finance-app/android/res/xml"
 ANDROID_KOTLIN_DIR="$ROOT/crates/finance-app/android/kotlin/dev/dioxus/main"
 VERSION_FILE="$ROOT/crates/finance-app/android/version-code.txt"
 UPDATES="$ROOT/updates"
-FDROID="${FINANCEVZ_FDROID:-0}"
 
 LAST_CODE="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
 [[ "$LAST_CODE" =~ ^[0-9]+$ ]] || LAST_CODE=1
@@ -79,9 +80,10 @@ else
 fi
 bash scripts/install-brand-icon.sh "$GEN"
 
-# El Gradle se regenera en cada dx build: inyectamos la firma leyendo secretos
-# del entorno en tiempo de build, nunca escribiéndolos en el archivo.
-FINANCEVZ_GRADLE="$APP_GRADLE" python3 - <<'PY'
+if [ "$FDROID" != "1" ]; then
+    # El Gradle se regenera en cada dx build: inyectamos la firma leyendo secretos
+    # del entorno en tiempo de build, nunca escribiéndolos en el archivo.
+    FINANCEVZ_GRADLE="$APP_GRADLE" python3 - <<'PY'
 import os
 
 path = os.environ["FINANCEVZ_GRADLE"]
@@ -111,10 +113,16 @@ with open(path, "w", encoding="utf-8") as handle:
     handle.write(text)
 PY
 
+fi
+
 (cd "$GEN" && ./gradlew assembleRelease)
 
 APK="$GEN/app/build/outputs/apk/release/app-release.apk"
-[[ -f "$APK" ]] || { echo "No se generó el APK firmado: $APK" >&2; exit 1; }
+UNSIGNED="$GEN/app/build/outputs/apk/release/app-release-unsigned.apk"
+if [ "$FDROID" = "1" ] && [[ ! -f "$APK" ]] && [[ -f "$UNSIGNED" ]]; then
+    APK="$UNSIGNED"
+fi
+[[ -f "$APK" ]] || { echo "No se generó el APK release: $APK" >&2; exit 1; }
 if [ "$FDROID" != "1" ]; then
     mkdir -p "$UPDATES"
     cp "$APK" "$UPDATES/financevz.apk"
@@ -127,6 +135,6 @@ if [ "$FDROID" != "1" ]; then
     echo "Versión: $VERSION_NAME (código $CODE)"
     echo "Recuerda: desinstala la versión debug antes de instalar esta firma."
 else
-    echo "APK F-Droid firmado/listo: $APK"
+    echo "APK F-Droid release (sin firmar por el proyecto): $APK"
     echo "Versión: $VERSION_NAME (código $CODE)"
 fi
