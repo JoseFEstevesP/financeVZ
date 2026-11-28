@@ -9,6 +9,7 @@ export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
 export ANDROID_NDK_HOME="$NDK_HOME"
+export PATH="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
 export JAVA_HOME="$HOME/.local/share/financeVZ-toolchain/jdk"
 
 TARGET="${1:-aarch64-linux-android}"

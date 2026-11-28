@@ -11,7 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
 
-typealias BuildConfig = com.gato99.financevz.BuildConfig
+typealias BuildConfig = com.joseE.financevz.BuildConfig
 
 class MainActivity : WryActivity() {
     private var webView: WebView? = null

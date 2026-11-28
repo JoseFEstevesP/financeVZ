@@ -3,5 +3,5 @@ name = "financevz"
 android_manifest = "android/AndroidManifest.xml"
 
 [bundle]
-identifier = "com.gato99.financevz"
-publisher = "gato99"
+identifier = "com.joseE.financevz"
+publisher = "joseE"

@@ -26,7 +26,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
-typealias BuildConfig = com.gato99.financevz.BuildConfig
+typealias BuildConfig = com.joseE.financevz.BuildConfig
 
 class MainActivity : WryActivity() {
     private var webView: WebView? = null

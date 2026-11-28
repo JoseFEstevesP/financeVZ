@@ -5,7 +5,7 @@
 - Workspace Rust (edition 2024) con tres crates: `finance-core` (dominio), `finance-store` (SQLite + migraciones) y `finance-app` (Dioxus 0.7 dentro de un WebView Android).
 - Entrada host: `crates/finance-app/src/main.rs` → `finance_app::run()` en `src/lib.rs`. El estado se inicializa una vez en `OnceLock<AppState>` antes de `dioxus::launch`; vistas en `src/views/`, estilos globales en `STYLES` de `lib.rs`.
 - Las migraciones son archivos numerados incluidos con `include_str!` en `finance-store/src/sqlite.rs`. Una nueva requiere crear `migrations/00NN_*.sql` **y** registrar `M::up(...)` en `MIGRATIONS`. Los tests usan `open_in_memory()` y aplican migraciones solos, sin servicios externos.
-- `Dioxus.toml` apunta al manifest Android; paquete `com.gato99.financevz`.
+- `Dioxus.toml` apunta al manifest Android; paquete `com.joseE.financevz`.
 
 ## Comandos que no se adivinan
 
