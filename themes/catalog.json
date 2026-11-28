@@ -1,0 +1,44 @@
+[
+  {
+    "id": "nord",
+    "name": "Nord",
+    "description": "Paleta fría inspirada en Nord.",
+    "is_dark": true,
+    "preview": [
+      "#2e3440",
+      "#3b4252",
+      "#88c0d0",
+      "#a3be8c"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/nord.json"
+  },
+  {
+    "id": "dracula",
+    "name": "Dracula",
+    "description": "Oscuro con acentos vibrantes.",
+    "is_dark": true,
+    "preview": [
+      "#282a36",
+      "#44475a",
+      "#bd93f9",
+      "#50fa7b"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/dracula.json"
+  },
+  {
+    "id": "solarized-light",
+    "name": "Solarized claro",
+    "description": "Claro suave con contraste equilibrado.",
+    "is_dark": false,
+    "preview": [
+      "#fdf6e3",
+      "#eee8d5",
+      "#268bd2",
+      "#859900"
+    ],
+    "version": "1.0.0",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/solarized-light.json"
+  }
+]

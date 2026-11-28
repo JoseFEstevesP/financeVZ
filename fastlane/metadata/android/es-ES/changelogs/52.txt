@@ -1,0 +1,2 @@
+• Catálogo web de temas y descarga de temas desde Configuración.
+• Temas descargados se validan y guardan localmente.

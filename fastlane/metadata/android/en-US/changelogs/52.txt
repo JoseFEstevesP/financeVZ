@@ -1,0 +1,2 @@
+• Web theme catalog and theme download from Settings.
+• Downloaded themes are validated and stored locally.

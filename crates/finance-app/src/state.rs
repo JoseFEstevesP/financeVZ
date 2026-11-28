@@ -13,6 +13,7 @@ use finance_core::{
 };
 use finance_store::SqliteRepository;
 use sha2::{Digest, Sha256};
+use std::io::Read;
 
 #[cfg(feature = "self-update")]
 use crate::platform::{UpdateProgress, UpdateSource};
@@ -214,6 +215,9 @@ pub struct AppState {
     pub locked: bool,
     pub text_scale: String,
     pub theme_id: String,
+    pub themes: Vec<crate::theme::ThemeDef>,
+    pub theme_catalog: Vec<crate::theme::ThemeCatalogEntry>,
+    pub theme_catalog_status: Option<String>,
     pub biometric_enabled: bool,
     pub auto_backup_hours: i64,
     pub evidence_viewer: Option<String>,
@@ -299,7 +303,10 @@ impl AppState {
             pin_error: None,
             locked: false,
             text_scale: "normal".to_owned(),
-            theme_id: crate::theme::default_theme().id.to_owned(),
+            theme_id: crate::theme::default_theme_id().to_owned(),
+            themes: crate::theme::builtin_themes(),
+            theme_catalog: Vec::new(),
+            theme_catalog_status: None,
             biometric_enabled: false,
             auto_backup_hours: 12,
             evidence_viewer: None,
@@ -314,12 +321,15 @@ impl AppState {
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| "normal".to_owned());
+            let mut themes = crate::theme::builtin_themes();
+            themes.extend(crate::theme::load_installed_themes());
+            state.themes = themes;
             state.theme_id = repo
                 .get_setting(THEME_SETTING)
                 .ok()
                 .flatten()
-                .map(|value| crate::theme::resolve(&value).id.to_owned())
-                .unwrap_or_else(|| crate::theme::default_theme().id.to_owned());
+                .map(|value| crate::theme::resolve(&value, &state.themes).id.clone())
+                .unwrap_or_else(|| crate::theme::default_theme_id().to_owned());
             state.biometric_enabled = repo
                 .get_setting(BIOMETRIC_SETTING)
                 .ok()
@@ -1895,17 +1905,100 @@ impl AppState {
         }
     }
 
-    pub fn current_theme(&self) -> &'static crate::theme::ThemeDef {
-        crate::theme::resolve(&self.theme_id)
+    pub fn current_theme(&self) -> &crate::theme::ThemeDef {
+        crate::theme::resolve(&self.theme_id, &self.themes)
     }
 
     pub fn set_theme(&mut self, value: &str) {
-        let theme = crate::theme::resolve(value);
+        let theme = crate::theme::resolve(value, &self.themes).clone();
         if let Ok(repo) = self.repo.lock() {
-            let _ = repo.set_setting(THEME_SETTING, theme.id);
+            let _ = repo.set_setting(THEME_SETTING, &theme.id);
         }
-        self.theme_id = theme.id.to_owned();
+        self.theme_id = theme.id;
         self.feedback = Some(format!("Tema actualizado: {}.", theme.name));
+    }
+
+    pub fn reload_themes(&mut self) {
+        let mut themes = crate::theme::builtin_themes();
+        themes.extend(crate::theme::load_installed_themes());
+        self.themes = themes;
+        self.theme_id = crate::theme::resolve(&self.theme_id, &self.themes)
+            .id
+            .clone();
+    }
+
+    pub fn install_theme_from_catalog(&mut self, entry: crate::theme::ThemeCatalogEntry) {
+        let result = (|| -> Result<crate::theme::ThemeDef, String> {
+            let resp = platform::http_agent()
+                .get(&entry.download_url)
+                .call()
+                .map_err(|e| format!("No se pudo descargar el tema: {e}"))?;
+            let mut body = String::new();
+            resp.into_body()
+                .into_reader()
+                .read_to_string(&mut body)
+                .map_err(|e| e.to_string())?;
+            let mut theme: crate::theme::ThemeDef =
+                serde_json::from_str(&body).map_err(|e| format!("Tema inválido: {e}"))?;
+            theme.builtin = false;
+            theme.id = crate::theme::sanitize_id(&theme.id)
+                .ok_or_else(|| "ID de tema inválido".to_owned())?;
+            if crate::theme::builtin_themes()
+                .iter()
+                .any(|t| t.id == theme.id)
+            {
+                return Err("Ese tema ya viene integrado en la app".to_owned());
+            }
+            theme.css_class = format!("theme-{}", theme.id);
+            crate::theme::save_installed_theme(&theme)?;
+            Ok(theme)
+        })();
+        match result {
+            Ok(theme) => {
+                self.reload_themes();
+                self.feedback = Some(format!("Tema instalado: {}.", theme.name));
+            }
+            Err(err) => self.feedback = Some(err),
+        }
+    }
+
+    pub fn remove_installed_theme(&mut self, id: &str) {
+        match crate::theme::remove_installed_theme(id) {
+            Ok(()) => {
+                self.reload_themes();
+                self.feedback = Some("Tema eliminado.".into());
+            }
+            Err(err) => self.feedback = Some(err),
+        }
+    }
+
+    pub fn refresh_theme_catalog(&mut self) {
+        self.theme_catalog_status = Some("Cargando temas...".into());
+        let result = (|| -> Result<Vec<crate::theme::ThemeCatalogEntry>, String> {
+            let resp = platform::http_agent()
+                .get(crate::theme::THEME_CATALOG_URL)
+                .call()
+                .map_err(|e| format!("No se pudo cargar el catálogo: {e}"))?;
+            let mut body = String::new();
+            resp.into_body()
+                .into_reader()
+                .read_to_string(&mut body)
+                .map_err(|e| e.to_string())?;
+            let catalog: Vec<crate::theme::ThemeCatalogEntry> =
+                serde_json::from_str(&body).map_err(|e| format!("Catálogo inválido: {e}"))?;
+            Ok(catalog)
+        })();
+        match result {
+            Ok(catalog) => {
+                self.theme_catalog_status = if catalog.is_empty() {
+                    Some("No hay temas disponibles por ahora.".into())
+                } else {
+                    None
+                };
+                self.theme_catalog = catalog;
+            }
+            Err(err) => self.theme_catalog_status = Some(err),
+        }
     }
 
     pub fn request_biometric(&mut self, action: &str) {

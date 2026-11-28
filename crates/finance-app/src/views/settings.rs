@@ -26,6 +26,9 @@ pub fn Settings(props: SettingsProps) -> Element {
     let pin_error = snapshot.pin_error.clone();
     let text_scale = snapshot.text_scale.clone();
     let current_theme_id = snapshot.theme_id.clone();
+    let themes = snapshot.themes.clone();
+    let theme_catalog = snapshot.theme_catalog.clone();
+    let theme_catalog_status = snapshot.theme_catalog_status.clone();
     let auto_backup_hours = snapshot.auto_backup_hours;
     let auto_backup_status = snapshot.auto_backup_status();
     drop(snapshot);
@@ -53,25 +56,94 @@ pub fn Settings(props: SettingsProps) -> Element {
             div { class: "card",
                 h3 { "Tema" }
                 p { class: "muted",
-                    "Elige el estilo visual de la app. El tema oscuro actual es el predeterminado."
+                    "Elige el estilo visual de la app. Puedes descargar más temas desde la web."
                 }
                 div { class: "theme-grid",
-                    for theme in crate::theme::THEMES {
-                        button {
-                            key: "{theme.id}",
-                            class: if current_theme_id == theme.id { "theme-card active" } else { "theme-card" },
-                            onclick: move |_| app_state.write().set_theme(theme.id),
-                            div { class: "theme-preview",
-                                for color in theme.preview {
-                                    span { class: "theme-swatch", style: "background:{color};" }
+                    for theme in themes.iter().cloned() {
+                        {
+                            let id = theme.id.clone();
+                            let id_remove = theme.id.clone();
+                            let is_active = current_theme_id == theme.id;
+                            let is_builtin = theme.builtin;
+                            rsx! {
+                                div { key: "{theme.id}", class: if is_active { "theme-card active" } else { "theme-card" },
+                                    button {
+                                        class: "theme-card-main",
+                                        onclick: move |_| app_state.write().set_theme(&id),
+                                        div { class: "theme-preview",
+                                            for color in theme.preview.iter().cloned() {
+                                                span { class: "theme-swatch", style: "background:{color};" }
+                                            }
+                                        }
+                                        div { class: "theme-meta",
+                                            strong { "{theme.name}" }
+                                            small { class: "muted", "{theme.description}" }
+                                        }
+                                    }
+                                    if is_active {
+                                        span { class: "theme-badge", "Actual" }
+                                    }
+                                    if !is_builtin {
+                                        button {
+                                            class: "theme-remove",
+                                            onclick: move |_| app_state.write().remove_installed_theme(&id_remove),
+                                            "Quitar"
+                                        }
+                                    }
                                 }
                             }
-                            div { class: "theme-meta",
-                                strong { "{theme.name}" }
-                                small { class: "muted", "{theme.description}" }
-                            }
-                            if current_theme_id == theme.id {
-                                span { class: "theme-badge", "Actual" }
+                        }
+                    }
+                }
+
+                h4 { class: "subheading", "Más temas" }
+                p { class: "muted",
+                    "Explora y descarga temas desde la página web del proyecto."
+                }
+                div { class: "row-buttons",
+                    a {
+                        class: "secondary",
+                        href: "https://josefestevesp.github.io/financeVZ/themes.html",
+                        target: "_blank",
+                        "Ver temas en la web"
+                    }
+                    button {
+                        class: "secondary",
+                        onclick: move |_| app_state.write().refresh_theme_catalog(),
+                        "Buscar temas"
+                    }
+                }
+                if let Some(status) = theme_catalog_status {
+                    p { class: "feedback", "{status}" }
+                }
+                if !theme_catalog.is_empty() {
+                    div { class: "theme-catalog",
+                        for entry in theme_catalog.iter().cloned() {
+                            {
+                                let installed = themes.iter().any(|t| t.id == entry.id);
+                                let entry_clone = entry.clone();
+                                rsx! {
+                                    div { class: "theme-catalog-row",
+                                        div { class: "theme-preview small",
+                                            for color in entry.preview.iter().cloned() {
+                                                span { class: "theme-swatch", style: "background:{color};" }
+                                            }
+                                        }
+                                        div { class: "grow",
+                                            strong { "{entry.name}" }
+                                            p { class: "muted", "{entry.description}" }
+                                        }
+                                        if installed {
+                                            span { class: "muted", "Instalado" }
+                                        } else {
+                                            button {
+                                                class: "primary small",
+                                                onclick: move |_| app_state.write().install_theme_from_catalog(entry_clone.clone()),
+                                                "Descargar"
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

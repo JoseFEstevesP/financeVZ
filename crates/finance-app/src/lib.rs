@@ -81,19 +81,20 @@ fn App() -> Element {
     let pending_delete_message = snapshot.pending_delete_message();
     #[cfg(feature = "self-update")]
     let update_available = snapshot.update_available.clone();
-    let theme = snapshot.current_theme();
+    let theme = snapshot.current_theme().clone();
     let shell_class = format!("shell {}", theme.css_class);
     let root_font_size = match snapshot.text_scale.as_str() {
         "small" => 14,
         "large" => 18,
         _ => 16,
     };
-    let styles = format!("{STYLES}\nhtml {{ font-size: {root_font_size}px; }}");
+    let installed_css = crate::theme::css_for_installed(&snapshot.themes);
+    let styles = format!("{STYLES}\n{installed_css}\nhtml {{ font-size: {root_font_size}px; }}");
     drop(snapshot);
 
     use_effect(move || {
-        let theme_id = app_state.read().current_theme().id;
-        bridge::request_theme(theme_id);
+        let theme_id = app_state.read().current_theme().id.clone();
+        bridge::request_theme(&theme_id);
     });
 
     use_effect(move || {
@@ -480,17 +481,26 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 .secondary.wide { width: 100%; margin-top: 1rem; }
 .subheading { color: var(--chip-text); font-size: .8125rem; margin: 1rem 0 .375rem; }
 .theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
-.theme-card { position: relative; display: flex; flex-direction: column; gap: .625rem; text-align: left;
+.theme-card { position: relative; display: flex; flex-direction: column; gap: .5rem; text-align: left;
   background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border);
-  border-radius: .875rem; padding: .75rem; cursor: pointer; }
+  border-radius: .875rem; padding: .75rem; }
 .theme-card.active { border-color: var(--primary); background: var(--chip-active-bg); }
+.theme-card-main { background: none; border: 0; color: inherit; padding: 0; margin: 0; text-align: left;
+  display: flex; flex-direction: column; gap: .625rem; cursor: pointer; width: 100%; }
 .theme-preview { display: grid; grid-template-columns: repeat(4, 1fr); gap: .375rem; }
+.theme-preview.small { width: 8rem; flex: none; }
 .theme-swatch { height: 1.75rem; border-radius: .5rem; border: 1px solid rgba(127,127,127,.25); }
 .theme-meta { display: flex; flex-direction: column; gap: .125rem; }
 .theme-meta strong { font-size: .875rem; }
 .theme-meta small { font-size: .75rem; line-height: 1.3; }
 .theme-badge { position: absolute; top: .625rem; right: .625rem; font-size: .6875rem; font-weight: 700;
   color: var(--primary-text); background: var(--primary); border-radius: 999px; padding: .125rem .5rem; }
+.theme-remove { align-self: flex-start; background: none; border: 1px solid var(--negative); color: var(--negative);
+  border-radius: .625rem; padding: .3rem .625rem; font-size: .75rem; cursor: pointer; }
+.theme-catalog { display: flex; flex-direction: column; gap: .625rem; margin-top: .75rem; }
+.theme-catalog-row { display: flex; align-items: center; gap: .75rem; padding: .625rem 0; border-bottom: 1px solid var(--row-border); }
+.theme-catalog-row .grow { display: flex; flex-direction: column; gap: .125rem; }
+a.secondary { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 @media (max-width: 420px) { .theme-grid { grid-template-columns: 1fr; } }
 .date-range { display: grid; grid-template-columns: 1fr 1fr; gap: .625rem; }
 .backup-json { resize: vertical; font-family: ui-monospace, monospace; font-size: .75rem; }

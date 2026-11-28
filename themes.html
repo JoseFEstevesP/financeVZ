@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temas — financeVZ</title>
+<meta name="description" content="Catálogo de temas descargables para financeVZ.">
+<style>
+  :root { --bg:#0b1220; --panel:#121c2e; --line:#27364f; --ink:#e8eef8; --muted:#9aabc4; --brand:#5b8cff; --accent:#2dd4a7; }
+  *{box-sizing:border-box} body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+  .wrap{width:min(1080px,92%);margin:0 auto} a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
+  header{display:flex;justify-content:space-between;align-items:center;padding:18px 0;border-bottom:1px solid var(--line)}
+  .brand{font-weight:700;font-size:20px;color:var(--ink)} nav a{margin-left:18px;font-size:14px}
+  .hero{padding:56px 0 30px} .hero h1{font-size:clamp(32px,6vw,52px);margin:0 0 8px} .hero p{color:var(--muted);max-width:720px;margin:0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;padding:30px 0 60px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .preview{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+  .swatch{height:38px;border-radius:8px;border:1px solid rgba(255,255,255,.08)}
+  .card h3{margin:0 0 4px;font-size:18px} .card p{margin:0 0 14px;color:var(--muted);font-size:14px}
+  .meta{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .badge{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .btn{display:inline-block;padding:9px 14px;border-radius:10px;font-weight:700;font-size:14px;border:1px solid var(--line);color:var(--ink)}
+  .btn:hover{border-color:var(--brand);text-decoration:none}
+  .note{background:#122a26;border:1px solid #1f5a4c;border-radius:10px;padding:16px 20px;color:#c9f4e6;margin-bottom:20px}
+  footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="index.html">financeVZ</a>
+    <nav><a href="index.html">Inicio</a><a href="manual/manual.html">Manual</a><a href="https://github.com/JoseFEstevesP/financeVZ/releases/latest">Descargar</a></nav>
+  </header>
+  <main>
+    <div class="hero">
+      <h1>Temas para financeVZ</h1>
+      <p>Descarga temas visuales para personalizar la app. En la app, ve a <b>Configuración → Tema → Buscar temas</b> para instalarlos directamente desde este catálogo.</p>
+    </div>
+    <div class="note">Los temas descargados solo cambian colores/variables visuales. Se validan antes de instalarse y se guardan localmente en tu dispositivo.</div>
+    <div id="grid" class="grid" aria-live="polite"></div>
+  </main>
+  <footer><span>financeVZ · Catálogo de temas</span><span><a href="https://github.com/JoseFEstevesP/financeVZ">GitHub</a></span></footer>
+</div>
+<script>
+async function load() {
+  const grid = document.getElementById('grid');
+  try {
+    const res = await fetch('themes/catalog.json', {cache:'no-store'});
+    const items = await res.json();
+    grid.innerHTML = items.map(item => `
+      <article class="card">
+        <div class="preview">${item.preview.map(c=>`<span class="swatch" style="background:${c}"></span>`).join('')}</div>
+        <h3>${item.name}</h3>
+        <p>${item.description}</p>
+        <div class="meta">
+          <span class="badge">${item.is_dark ? 'Oscuro' : 'Claro'} · v${item.version || '1.0.0'}</span>
+          <a class="btn" href="${item.download_url}" download>Descargar JSON</a>
+        </div>
+      </article>`).join('');
+  } catch (e) {
+    grid.innerHTML = '<p>No se pudo cargar el catálogo de temas.</p>';
+  }
+}
+load();
+</script>
+</body>
+</html>

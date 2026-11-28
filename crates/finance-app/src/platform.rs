@@ -65,11 +65,15 @@ fn fetch_rate_from_bcv(agent: &ureq::Agent) -> Option<i64> {
     parse_bcv_rate(&html)
 }
 
-pub fn fetch_exchange_rate() -> Option<(i64, &'static str)> {
-    let secure_agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(15)))
+pub fn http_agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(20)))
         .build()
-        .new_agent();
+        .new_agent()
+}
+
+pub fn fetch_exchange_rate() -> Option<(i64, &'static str)> {
+    let secure_agent = http_agent();
     let bcv_agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
         // El BCV sirve una cadena de certificados incompleta; se aísla aquí su workaround.
@@ -760,7 +764,7 @@ pub fn install_update(
 }
 
 #[cfg(target_os = "android")]
-fn app_files_dir() -> Result<PathBuf, String> {
+pub fn app_files_dir() -> Result<PathBuf, String> {
     use jni::objects::JObject;
 
     let ctx = ndk_context::android_context();
@@ -790,7 +794,7 @@ fn app_files_dir() -> Result<PathBuf, String> {
 }
 
 #[cfg(not(target_os = "android"))]
-fn app_files_dir() -> Result<PathBuf, String> {
+pub fn app_files_dir() -> Result<PathBuf, String> {
     Ok(std::env::var("FINANCEVZ_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))))

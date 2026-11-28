@@ -4,6 +4,17 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.52] - 2026-11-28
+
+### Añadido
+
+- Catálogo web de temas (`themes.html` + `themes/catalog.json`) con temas descargables.
+- Configuración: buscar/descargar temas desde el catálogo, instalar/quitar temas locales y aplicar CSS de temas instalados.
+
+### Cambiado
+
+- Sistema de temas extensible por `theme_id`, con validación de temas descargados y persistencia local.
+
 ## [0.1.51] - 2026-11-28
 
 ### Añadido
