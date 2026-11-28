@@ -4,6 +4,13 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.1.46] - 2026-11-27
+
+### Añadido
+
+- La pestaña Actualizar muestra un botón «Activar avisos de actualización» cuando el permiso de notificaciones está desactivado.
+- Inicio y Actividad muestran el saldo total y el saldo acumulado después de cada movimiento.
+
 ## [0.1.45] - 2026-11-27
 
 ### Corregido

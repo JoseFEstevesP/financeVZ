@@ -23,7 +23,7 @@ Manual de usuario: [HTML](manual/manual.html) · [PDF](manual/manual.pdf). Polí
 ## Descargar
 
 - Página web: https://josefestevesp.github.io/financeVZ/
-- APK firmado 0.1.45: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz-0.1.45.apk
+- APK firmado 0.1.46: https://github.com/JoseFEstevesP/financeVZ/releases/latest/download/financevz.apk
 - Todas las versiones: https://github.com/JoseFEstevesP/financeVZ/releases
 
 Si vienes de un build debug, desinstálalo antes: la firma release es distinta y Android no permite actualizar entre firmas.
