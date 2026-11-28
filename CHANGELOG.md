@@ -4,6 +4,20 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
+### Añadido
+
+- La app explica para qué pide el permiso de notificaciones y ofrece abrir los ajustes del sistema si se rechaza.
+
+### Corregido
+
+- Una versión nueva no se marca como ya notificada cuando el permiso de notificaciones está denegado, para que el aviso aparezca al reactivarlo.
+
+## [0.1.42] - 2026-11-27
+
+### Añadido
+
+- Variante de build F-Droid: `FINANCEVZ_FDROID=1` compila sin auto-actualizador, sin `REQUEST_INSTALL_PACKAGES` y sin WorkManager/notificaciones de actualización; la actualización queda a cargo de la tienda. El build GitHub mantiene el actualizador (`self-update` por defecto).
+
 ### Cambiado
 
 - Las horas visibles en el historial de actividad y en el estado de la copia automática usan formato de 12 horas con `a. m.`/`p. m.` en lugar de 24.
@@ -12,7 +26,7 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 - La política de privacidad enumera ahora DolarAPI, BCV y GitHub Releases, que son las únicas conexiones de la app.
 - DolarAPI se consulta con verificación TLS normal; el workaround de certificados del BCV queda aislado.
-- El actualizador solo acepta URLs `http://` de la red local (localhost, `127.x`, `10.x`, `172.16-31.x` o `192.168.x`); para Internet exige `https://`.
+- El actualizador solo acepta URLs `http://` de la red local (localhost, `127.x`, `10.x`, `172.16-31.x`, `192.168.x` o `169.254.x`); para Internet exige `https://`.
 
 ## [0.1.40] - 2026-11-26
 
