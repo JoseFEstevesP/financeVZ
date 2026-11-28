@@ -36,12 +36,13 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) : Worker(
             if (info == null) return Result.success()
 
             val localCode = localVersionCode(applicationContext)
+            val notified = prefs.getLong("notified_update_version", -1L)
             if (info.versionCode <= localCode) {
+                cancelUpdateNotifications(applicationContext, notified)
                 prefs.edit().remove("notified_update_version").apply()
                 return Result.success()
             }
 
-            val notified = prefs.getLong("notified_update_version", -1L)
             if (notified == info.versionCode) return Result.success()
 
             showUpdateNotification(applicationContext, info.versionName, info.versionCode)
@@ -147,6 +148,19 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) : Worker(
             .setContentIntent(pending)
             .build()
         NotificationManagerCompat.from(context).notify(versionCode.toInt(), notification)
+    }
+
+    private fun cancelUpdateNotifications(context: Context, notifiedVersion: Long) {
+        val nm = NotificationManagerCompat.from(context)
+        if (notifiedVersion > 0L) {
+            nm.cancel(notifiedVersion.toInt())
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val service = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            service.activeNotifications
+                .filter { it.packageName == context.packageName && it.notification.channelId == CHANNEL_ID }
+                .forEach { nm.cancel(it.id) }
+        }
     }
 
     companion object {

@@ -56,6 +56,7 @@ class MainActivity : WryActivity() {
         super.onResume()
         checkPendingDownload()
         cleanupInstalledUpdate()
+        clearStaleUpdateNotification()
     }
 
     private fun cleanupInstalledUpdate() {
@@ -81,6 +82,29 @@ class MainActivity : WryActivity() {
                 external?.listFiles()
                     ?.filter { it.isFile && it.name.startsWith("financevz-update") && it.name.endsWith(".apk") }
                     ?.forEach { it.delete() }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun clearStaleUpdateNotification() {
+        try {
+            val installedVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageManager.getPackageInfo(packageName, 0).longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+            }
+            val notified = prefs.getLong("notified_update_version", -1L)
+            if (notified > 0L && notified <= installedVersion) {
+                val nm = androidx.core.app.NotificationManagerCompat.from(this)
+                nm.cancel(notified.toInt())
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val service = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    service.activeNotifications
+                        .filter { it.packageName == packageName && it.notification.channelId == "financevz_updates" }
+                        .forEach { nm.cancel(it.id) }
+                }
+                prefs.edit().remove("notified_update_version").apply()
             }
         } catch (_: Exception) {}
     }

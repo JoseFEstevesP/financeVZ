@@ -4,13 +4,12 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 ## [Unreleased]
 
-### Añadido
-
-- La app explica para qué pide el permiso de notificaciones y ofrece abrir los ajustes del sistema si se rechaza.
+## [0.1.45] - 2026-11-27
 
 ### Corregido
 
-- Una versión nueva no se marca como ya notificada cuando el permiso de notificaciones está denegado, para que el aviso aparezca al reactivarlo.
+- La notificación de actualización disponible se cancela automáticamente al abrir la app cuando la versión instalada ya es igual o superior, evitando avisos obsoletos.
+- El worker de comprobación de actualizaciones también limpia notificaciones obsoletas cuando detecta que no hay una versión nueva.
 
 ## [0.1.44] - 2026-11-27
 
