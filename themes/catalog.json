@@ -72,7 +72,7 @@
   {
     "id": "gato",
     "name": "Gato neón",
-    "description": "Oscuro con gatos de colores, orejas redondeadas y cola.",
+    "description": "Oscuro con gatos de colores.",
     "is_dark": true,
     "preview": [
       "#0f172a",
@@ -80,8 +80,8 @@
       "#22d3ee",
       "#a3e635"
     ],
-    "version": "1.3.1",
-    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato.json?v=1.3.1"
+    "version": "1.3.2",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato.json?v=1.3.2"
   },
   {
     "id": "perro",
@@ -156,7 +156,7 @@
   {
     "id": "gato-morado",
     "name": "Gato Morado",
-    "description": "Variante morada: gatos curiosos, orejas redondeadas y cola suave.",
+    "description": "Variante morada: gatos curiosos suave.",
     "is_dark": true,
     "preview": [
       "#0f172a",
@@ -164,13 +164,13 @@
       "#a78bfa",
       "#67e8f9"
     ],
-    "version": "1.3.1",
-    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato-morado.json?v=1.3.1"
+    "version": "1.3.2",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato-morado.json?v=1.3.2"
   },
   {
     "id": "gato-naranja",
     "name": "Gato Ámbar",
-    "description": "Variante cálida: gatos juguetones, orejas redondeadas y cola.",
+    "description": "Variante cálida: gatos juguetones.",
     "is_dark": true,
     "preview": [
       "#0f172a",
@@ -178,7 +178,7 @@
       "#fb923c",
       "#fde047"
     ],
-    "version": "1.3.1",
-    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato-naranja.json?v=1.3.1"
+    "version": "1.3.2",
+    "download_url": "https://josefestevesp.github.io/financeVZ/themes/gato-naranja.json?v=1.3.2"
   }
 ]
