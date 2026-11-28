@@ -12,6 +12,12 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 
 - Una versión nueva no se marca como ya notificada cuando el permiso de notificaciones está denegado, para que el aviso aparezca al reactivarlo.
 
+## [0.1.43] - 2026-11-27
+
+### Corregido
+
+- El actualizador en Android localiza correctamente el APK descargado aunque DownloadManager lo renombre (por ejemplo `financevz-update-1.apk`), evitando el falso error “El APK descargado no es válido”.
+
 ## [0.1.42] - 2026-11-27
 
 ### Añadido

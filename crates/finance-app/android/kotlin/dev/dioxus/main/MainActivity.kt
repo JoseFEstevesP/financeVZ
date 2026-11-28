@@ -257,6 +257,7 @@ class MainActivity : WryActivity() {
         val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val query = DownloadManager.Query().setFilterById(id)
         val cursor = dm.query(query)
+        var localUri: String? = null
         cursor.use {
             if (!it.moveToFirst()) {
                 notifyDownload("error", "No se pudo verificar la descarga.")
@@ -269,10 +270,12 @@ class MainActivity : WryActivity() {
                 cleanupFailedDownload()
                 return
             }
+            val uriIdx = it.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
+            if (uriIdx >= 0) localUri = it.getString(uriIdx)
         }
         val external = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val externalFile = File(external, "financevz-update.apk")
-        if (!externalFile.exists() || externalFile.length() < 1_000_000L) {
+        val externalFile = resolveDownloadedApk(external, localUri)
+        if (externalFile == null || !externalFile.exists() || externalFile.length() < 1_000_000L) {
             notifyDownload("error", "El APK descargado no es válido.")
             cleanupFailedDownload()
             return
@@ -297,12 +300,36 @@ class MainActivity : WryActivity() {
         notifyDownload("completed", "Actualización descargada. Pulsa «Instalar APK descargado».")
     }
 
+    private fun resolveDownloadedApk(external: File?, localUri: String?): File? {
+        if (localUri != null) {
+            try {
+                val parsed = Uri.parse(localUri)
+                if (parsed.scheme == "file") {
+                    val path = parsed.path
+                    if (path != null) {
+                        val file = File(path)
+                        if (file.exists()) return file
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        val preferred = File(external, "financevz-update.apk")
+        if (preferred.exists()) return preferred
+        val dir = external ?: return null
+        return dir.listFiles()
+            ?.filter { it.isFile && it.name.startsWith("financevz-update") && it.name.endsWith(".apk") }
+            ?.maxByOrNull { it.lastModified() }
+    }
+
     private fun cleanupFailedDownload() {
         val updatesDir = File(filesDir, "updates")
         File(updatesDir, "financevz.apk").delete()
         File(updatesDir, "version-code.txt").delete()
         val external = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         File(external, "financevz-update.apk").delete()
+        external?.listFiles()
+            ?.filter { it.isFile && it.name.startsWith("financevz-update") && it.name.endsWith(".apk") }
+            ?.forEach { it.delete() }
         prefs.edit().remove("pending_download_id").remove("pending_download_sha").remove("pending_download_version").apply()
     }
 
