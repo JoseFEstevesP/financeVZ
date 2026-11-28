@@ -192,7 +192,7 @@ pub fn validate_theme(theme: &ThemeDef) -> Result<(), String> {
     for c in &theme.preview {
         validate_color(c)?;
     }
-    if theme.extra_css.len() > 16_000 {
+    if theme.extra_css.len() > 64_000 {
         return Err("El CSS extra del tema es demasiado grande".to_owned());
     }
     if !theme.builtin {
