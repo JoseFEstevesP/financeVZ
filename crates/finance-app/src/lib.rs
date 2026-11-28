@@ -335,6 +335,8 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
   background: var(--input-bg); border-radius: .625rem; font-size: 1.125rem; flex: none; }
 .expense-info { flex: 1; display: flex; flex-direction: column; gap: .125rem; min-width: 0; }
 .expense-amount { font-variant-numeric: tabular-nums; font-weight: 600; flex: none; }
+.expense-amounts { display: flex; flex-direction: column; align-items: flex-end; gap: .125rem; flex: none; }
+.balance-after { font-size: .6875rem; white-space: nowrap; }
 .expense-actions { display: flex; flex-direction: column; gap: .125rem; flex: none; }
 .table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--row-border);
   border-radius: .75rem; }

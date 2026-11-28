@@ -39,12 +39,14 @@ pub fn Activity(props: ActivityProps) -> Element {
     let mut filter = use_signal(|| ActivityFilter::All);
     let snapshot = app_state.read();
     let entries: Vec<_> = snapshot.activity.clone();
+    let balances = snapshot.activity_running_balances();
     drop(snapshot);
 
     let selected = filter();
-    let entries: Vec<_> = entries
+    let entries_with_bal: Vec<_> = entries
         .into_iter()
-        .filter(|entry| match selected {
+        .zip(balances.into_iter())
+        .filter(|(entry, _)| match selected {
             ActivityFilter::All => true,
             ActivityFilter::Expense => entry.kind.is_expense(),
             ActivityFilter::Income => entry.kind.is_income(),
@@ -53,12 +55,16 @@ pub fn Activity(props: ActivityProps) -> Element {
         .collect();
 
     let mut grouped: Vec<(String, Vec<_>)> = Vec::new();
-    for entry in entries {
+    for (entry, bal) in entries_with_bal {
         let day = format_date(entry.occurred_at.with_timezone(&Local).date_naive());
         if grouped.last().is_none_or(|(last_day, _)| last_day != &day) {
             grouped.push((day, Vec::new()));
         }
-        grouped.last_mut().expect("grupo activo").1.push(entry);
+        grouped
+            .last_mut()
+            .expect("grupo activo")
+            .1
+            .push((entry, bal));
     }
 
     rsx! {
@@ -92,8 +98,8 @@ pub fn Activity(props: ActivityProps) -> Element {
                 for (day, items) in grouped {
                     div { class: "card",
                         h3 { "{day}" }
-                        for entry in items {
-                            div { class: "expense-row",
+                        for (entry, bal_after) in items {
+                            div { class: "expense-row activity-row",
                                 div { class: "expense-icon",
                                     Icon { name: icon_for_kind(entry.kind), class: "row-icon" }
                                 }
@@ -101,7 +107,10 @@ pub fn Activity(props: ActivityProps) -> Element {
                                     strong { "{entry.kind.label()}" }
                                     small { class: "muted", "{entry.summary}" }
                                 }
-                                span { class: "expense-amount", "{money_usd(entry.amount_cents)}" }
+                                div { class: "expense-amounts",
+                                    span { class: "expense-amount", "{money_usd(entry.amount_cents)}" }
+                                    small { class: "muted balance-after", "Total: {money_usd(bal_after)}" }
+                                }
                                 small { class: "muted",
                                     {format_activity_moment(entry.occurred_at)
                                         .split_once(' ')

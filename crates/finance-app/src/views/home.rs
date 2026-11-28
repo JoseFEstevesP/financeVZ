@@ -23,6 +23,7 @@ struct RecentRow {
     amount: String,
     secondary: Option<String>,
     evidence: Option<String>,
+    balance_after: i64,
 }
 
 #[component]
@@ -32,11 +33,25 @@ pub fn Home(props: HomeProps) -> Element {
     let month_total = state.month_total();
     let month_income = state.month_income_total();
     let balance = state.month_balance();
+    let total_balance = state.all_time_balance();
     let rate = state.exchange_rate_cents;
     let due = state.due_payments();
     let report = state.report();
-    let recent: Vec<RecentRow> = state
-        .recent(6)
+    // Balance after each recent expense: total actual menos movimientos más nuevos.
+    let recent_expenses = state.recent(6);
+    let mut movements: Vec<(
+        chrono::NaiveDate,
+        chrono::DateTime<chrono::FixedOffset>,
+        i64,
+    )> = Vec::new();
+    for e in &state.expenses {
+        movements.push((e.local_date, e.spent_at, -e.amount.cents()));
+    }
+    for i in &state.incomes {
+        movements.push((i.local_date, i.received_at, i.amount.cents()));
+    }
+    movements.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.cmp(&a.0)));
+    let recent: Vec<RecentRow> = recent_expenses
         .iter()
         .map(|expense| {
             let category = state.category_of(expense.category_id);
@@ -45,6 +60,17 @@ pub fn Home(props: HomeProps) -> Element {
                 .rate_cents
                 .or_else(|| state.rate_value_for(expense.local_date))
                 .unwrap_or(rate);
+            // balance after this expense: total_balance minus movements that are strictly newer
+            let mut bal_after = total_balance;
+            for m in &movements {
+                if m.1 > expense.spent_at || (m.1 == expense.spent_at && m.0 > expense.local_date) {
+                    bal_after -= m.2;
+                } else {
+                    break;
+                }
+            }
+            // but the expense itself is in movements; ensure we count "after this expense" as including it
+            // simpler: balance after = bal_after (we subtracted newer). That means state after this expense applied.
             RecentRow {
                 id: expense.id,
                 icon: icon_for_category(
@@ -66,6 +92,7 @@ pub fn Home(props: HomeProps) -> Element {
                     expense.original_currency.as_deref(),
                 ),
                 evidence: expense.evidence_path.clone(),
+                balance_after: bal_after,
             }
         })
         .collect();
@@ -78,6 +105,11 @@ pub fn Home(props: HomeProps) -> Element {
         .map(|report| report.total.cents())
         .unwrap_or(0);
     let balance_class = if balance >= 0 {
+        "balance-positive"
+    } else {
+        "balance-negative"
+    };
+    let total_balance_class = if total_balance >= 0 {
         "balance-positive"
     } else {
         "balance-negative"
@@ -138,19 +170,23 @@ pub fn Home(props: HomeProps) -> Element {
             }
 
             div { class: "card",
-                h3 { "Resumen del mes" }
+                h3 { "Resumen" }
                 div { class: "summary-grid",
                     div {
-                        span { class: "muted", "Ingresos" }
+                        span { class: "muted", "Ingresos (mes)" }
                         strong { "{money_usd(month_income)}" }
                     }
                     div {
-                        span { class: "muted", "Gastos" }
+                        span { class: "muted", "Gastos (mes)" }
                         strong { "{money_usd(month_total)}" }
                     }
                     div {
-                        span { class: "muted", "Balance" }
+                        span { class: "muted", "Balance (mes)" }
                         strong { class: balance_class, "{money_usd(balance)}" }
+                    }
+                    div {
+                        span { class: "muted", "Saldo total" }
+                        strong { class: total_balance_class, "{money_usd(total_balance)}" }
                     }
                 }
                 button {
@@ -231,7 +267,10 @@ pub fn Home(props: HomeProps) -> Element {
                                     small { class: "muted", "{secondary}" }
                                 }
                             }
-                            span { class: "expense-amount", "{expense.amount}" }
+                            div { class: "expense-amounts",
+                                span { class: "expense-amount", "{expense.amount}" }
+                                small { class: "muted balance-after", "Total: {money_usd(expense.balance_after)}" }
+                            }
                             div { class: "expense-actions",
                                 button {
                                     class: "icon-button",

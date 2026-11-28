@@ -2102,6 +2102,40 @@ impl AppState {
         self.month_income_total() - self.month_total()
     }
 
+    pub fn all_time_balance(&self) -> i64 {
+        let income: i64 = self.incomes.iter().map(|i| i.amount.cents()).sum();
+        let expense: i64 = self.expenses.iter().map(|e| e.amount.cents()).sum();
+        income - expense
+    }
+
+    /// Saldo acumulado después de cada actividad (en el mismo orden que `self.activity`).
+    /// Calcula el impacto de cada acción sobre el balance; los edits se tratan como
+    /// impacto 0 porque el log solo guarda el monto final, no el delta.
+    pub fn activity_running_balances(&self) -> Vec<i64> {
+        fn delta(kind: ActivityKind, amount_cents: i64) -> i64 {
+            match kind {
+                ActivityKind::IncomeCreated
+                | ActivityKind::ExpenseRefunded
+                | ActivityKind::ExpenseDeleted => amount_cents,
+                ActivityKind::ExpenseCreated
+                | ActivityKind::PaymentPaid
+                | ActivityKind::IncomeDeleted => -amount_cents,
+                ActivityKind::ExpenseUpdated
+                | ActivityKind::IncomeUpdated
+                | ActivityKind::PaymentCreated
+                | ActivityKind::PaymentDeleted => 0,
+            }
+        }
+        // self.activity está en orden desc (más reciente primero). Calculamos hacia atrás.
+        let mut balances = vec![0i64; self.activity.len()];
+        let mut running = self.all_time_balance();
+        for (i, entry) in self.activity.iter().enumerate() {
+            balances[i] = running;
+            running -= delta(entry.kind, entry.amount_cents);
+        }
+        balances
+    }
+
     pub fn recent(&self, limit: usize) -> Vec<Expense> {
         self.expenses.iter().take(limit).cloned().collect()
     }
