@@ -53,6 +53,8 @@ DX_FEATURES=""
 if [ "$FDROID" = "1" ]; then
     DX_FEATURES="--no-default-features --features mobile"
 fi
+# dx genera su propio Kotlin; evita compilar los archivos del build anterior.
+rm -f "$GEN/app/src/main/kotlin/dev/dioxus/main/"*.kt
 dx build --android -p finance-app --target "$TARGET" $DX_FEATURES
 
 GRADLE="$GEN/app/build.gradle.kts"

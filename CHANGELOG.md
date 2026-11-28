@@ -11,6 +11,10 @@ Todos los cambios notables de financeVZ. El formato sigue Keep a Changelog.
 - La pestaña Actualizar muestra un botón «Activar avisos de actualización» cuando el permiso de notificaciones está desactivado.
 - Inicio y Actividad muestran el saldo total y el saldo acumulado después de cada movimiento.
 
+### Corregido
+
+- Los builds Android ya no compilan Kotlin personalizado sobrante de un build anterior cuando `dx build` regenera el proyecto.
+
 ## [0.1.45] - 2026-11-27
 
 ### Corregido
